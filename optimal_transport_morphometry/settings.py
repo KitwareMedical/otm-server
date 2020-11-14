@@ -38,5 +38,7 @@ class ProductionConfiguration(OptimalTransportMorphometryConfig, ProductionBaseC
     pass
 
 
-class HerokuProductionConfiguration(OptimalTransportMorphometryConfig, HerokuProductionBaseConfiguration):
+class HerokuProductionConfiguration(
+    OptimalTransportMorphometryConfig, HerokuProductionBaseConfiguration
+):
     pass

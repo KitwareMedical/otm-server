@@ -1,3 +1,3 @@
-from .image import ImageAdmin
+from .atlas import AtlasAdmin
 
-__all__ = ['ImageAdmin']
+__all__ = ['AtlasAdmin']

@@ -6,7 +6,6 @@ from drf_yasg2.views import get_schema_view
 from rest_framework import permissions, routers
 
 from optimal_transport_morphometry.core.rest import ImageViewSet
-from optimal_transport_morphometry.core.views import GalleryView, image_summary
 
 router = routers.SimpleRouter()
 router.register(r'images', ImageViewSet)
@@ -25,8 +24,6 @@ urlpatterns = [
     path('api/v1/', include(router.urls)),
     path('api/docs/redoc', schema_view.with_ui('redoc'), name='docs-redoc'),
     path('api/docs/swagger', schema_view.with_ui('swagger'), name='docs-swagger'),
-    path('summary/', image_summary, name='image-summary'),
-    path('gallery/', GalleryView.as_view(), name='gallery'),
 ]
 
 if settings.DEBUG:
