@@ -13,6 +13,12 @@ def batch(dataset) -> models.UploadBatch:
 
 
 @pytest.mark.django_db
+def test_load_batch_from_csv(batch):
+    assert batch.pending_uploads.count() == 3
+    assert models.Patient.objects.count() == 3
+
+
+@pytest.mark.django_db
 def test_upload_batch_finalization_cleanup(batch):
     for pending in batch.pending_uploads.all():
         batch.refresh_from_db()
