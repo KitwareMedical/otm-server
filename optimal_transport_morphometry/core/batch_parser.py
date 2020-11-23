@@ -16,7 +16,9 @@ def load_batch_from_csv(csvfile: TextIO, dest: models.Dataset) -> models.UploadB
         expected_name = row.pop('name')
         patient_id = row.pop('patient', '').strip() or uuid4().hex
         # TODO allow using existing patients too
-        patient = models.Patient.objects.create(identifier=patient_id, metadata=row)
-        models.PendingUpload.objects.create(batch=batch, patient=patient, name=expected_name)
+        patient = models.Patient.objects.create(identifier=patient_id)
+        models.PendingUpload.objects.create(
+            batch=batch, patient=patient, name=expected_name, metadata=row
+        )
 
     return batch

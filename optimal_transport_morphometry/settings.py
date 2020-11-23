@@ -11,19 +11,26 @@ from composed_configuration import (
     TestingBaseConfiguration,
 )
 
+_pkg = 'optimal_transport_morphometry'
+
 
 class OptimalTransportMorphometryConfig(ConfigMixin):
-    WSGI_APPLICATION = 'optimal_transport_morphometry.wsgi.application'
-    ROOT_URLCONF = 'optimal_transport_morphometry.urls'
+    WSGI_APPLICATION = f'{_pkg}.wsgi.application'
+    ROOT_URLCONF = f'{_pkg}.urls'
 
     BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 
     @staticmethod
     def before_binding(configuration: ComposedConfiguration) -> None:
         configuration.INSTALLED_APPS += [
-            'optimal_transport_morphometry.core.apps.CoreConfig',
+            f'{_pkg}.core.apps.CoreConfig',
             's3_file_field',
         ]
+        configuration.REST_FRAMEWORK.update(
+            {
+                'DEFAULT_PAGINATION_CLASS': f'{_pkg}.core.pagination.BoundedLimitOffsetPagination',
+            }
+        )
 
 
 class DevelopmentConfiguration(OptimalTransportMorphometryConfig, DevelopmentBaseConfiguration):

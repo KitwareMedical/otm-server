@@ -1,12 +1,13 @@
 from enum import Enum
 from typing import Type
 
-from django.core.exceptions import ValidationError
 from django.db import models
 from django.dispatch import receiver
+from django_extensions.db.models import TimeStampedModel
 from s3_file_field import S3FileField
 
 from .dataset import Dataset
+from .metadata import MetadataField
 from .patient import Patient
 
 
@@ -14,22 +15,7 @@ class ImageType(Enum):
     structural_mri = 'structural_mri'
 
 
-def validate_metadata(val) -> None:
-    if not isinstance(val, dict):
-        raise ValidationError('Must be a JSON Object.')
-
-
-class MetadataField(models.JSONField):
-    empty_values = [{}]
-
-    def __init__(self, *args, **kwargs):
-        kwargs['default'] = dict
-        kwargs['blank'] = True
-        super().__init__(*args, **kwargs)
-        self.validators.append(validate_metadata)
-
-
-class Image(models.Model):
+class Image(TimeStampedModel, models.Model):
     class Meta:
         indexes = [models.Index(fields=['dataset'])]
         ordering = ['name']
