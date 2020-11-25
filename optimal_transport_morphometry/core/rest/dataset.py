@@ -1,6 +1,5 @@
 from django_filters import rest_framework as filters
 from rest_framework import serializers
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
@@ -25,5 +24,3 @@ class DatasetViewSet(ModelViewSet):
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['name']
-
-    pagination_class = PageNumberPagination
