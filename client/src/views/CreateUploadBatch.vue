@@ -4,7 +4,7 @@
       :dest="{ datasetId }"
       :multiple="false"
       accept="text/csv"
-      :upload-cls="UploadHandler"
+      :upload-cls="CSVUploadHandler"
     >
       <template #header>
         <v-card-title primary-title>
@@ -30,13 +30,15 @@ export default {
   props: {
     datasetId: {
       required: true,
-      type: Number,
+      type: String,
     },
   },
   data() {
     return {
-      UploadHandler,
     };
+  },
+  created() {
+    this.CSVUploadHandler = CSVUploadHandler;
   },
 };
 </script>

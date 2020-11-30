@@ -5,7 +5,8 @@ class CSVUploadHandler extends UploadBase {
     const fd = new FormData();
     fd.append('csvfile', this.file);
     fd.append('dataset', this.parent.datasetId);
-    return (await this.$rest.post('upload_batches', fd, {
+    this.progress({ indeterminate: true });
+    const result = (await this.$rest.post('upload_batches', fd, {
       onUploadProgress: (e) => this.progress({
         indeterminate: !e.lengthComputable,
         current: e.loaded,
@@ -15,6 +16,14 @@ class CSVUploadHandler extends UploadBase {
         'Content-Type': 'multipart/form-data',
       },
     })).data;
+
+    this.progress({
+      indeterminate: false,
+      size: this.file.size,
+      current: this.file.size,
+    });
+
+    return result;
   }
 
   async resume() {

@@ -2,23 +2,23 @@
   <v-data-table
     :loading="loading"
     item-key="id"
-    :items="datasets"
+    :items="images"
     :headers="headers"
-  >
-    <template #item.name="{ item }">
-      <router-link :to="`dataset/${item.id}/images`">
-        {{ item.name }}
-      </router-link>
-    </template>
-  </v-data-table>
+  />
 </template>
 
 <script>
 export default {
   inject: ['girderRest'],
+  props: {
+    datasetId: {
+      required: true,
+      type: String,
+    },
+  },
   data() {
     return {
-      datasets: [],
+      images: [],
       loading: true,
     };
   },
@@ -39,9 +39,9 @@ export default {
   async mounted() {
     // TODO pagination
     this.loading = true;
-    const resp = await this.girderRest.get('datasets');
+    const resp = await this.girderRest.get('images', { params: { dataset: this.datasetId }});
+    this.images = resp.data.results;
     this.loading = false;
-    this.datasets = resp.data.results;
   }
 };
 </script>
