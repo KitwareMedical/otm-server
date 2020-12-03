@@ -4,12 +4,13 @@
       :dest="{ datasetId }"
       :multiple="false"
       accept="text/csv"
-      :upload-cls="CSVUploadHandler"
+      :upload-cls="BatchCSVUploadHandler"
+      @done="uploadDone"
     >
       <template #header>
         <v-card-title primary-title>
           <div>
-            <div class="headline">
+            <div class="title">
               Upload a CSV listing images to be uploaded
             </div>
           </div>
@@ -21,7 +22,7 @@
 
 <script>
 import GirderUpload from '@girder/components/src/components/Upload.vue';
-import { CSVUploadHandler } from '../upload';
+import { BatchCSVUploadHandler } from '../upload';
 
 export default {
   components: {
@@ -33,12 +34,13 @@ export default {
       type: String,
     },
   },
-  data() {
-    return {
-    };
-  },
   created() {
-    this.CSVUploadHandler = CSVUploadHandler;
+    this.BatchCSVUploadHandler = BatchCSVUploadHandler;
+  },
+  methods: {
+    uploadDone([result]) {
+      this.$router.push(`/upload/${result.id}`);
+    },
   },
 };
 </script>

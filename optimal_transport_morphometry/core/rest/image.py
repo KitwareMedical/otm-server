@@ -5,8 +5,7 @@ from django_filters import rest_framework as filters
 from drf_yasg2.utils import swagger_auto_schema
 from rest_framework import serializers
 from rest_framework.decorators import action
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -20,21 +19,20 @@ class ImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['type', 'dataset', 'patient', 'metadata']
 
 
-class CreateImageSerializer(serializers.ModelSerializer):
+class CreateImageSerializer(serializers.Serializer):
     pending_upload = serializers.IntegerField()
+    # TODO this will require a special deserializer
     object_key = serializers.CharField()
 
 
 class ImageViewSet(ModelViewSet):
     queryset = Image.objects.all()
 
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [AllowAny]
     serializer_class = ImageSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['name']
-
-    pagination_class = PageNumberPagination
 
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):

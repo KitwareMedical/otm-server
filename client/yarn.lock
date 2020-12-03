@@ -848,10 +848,10 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
-"@girder/components@^2.2.8":
-  version "2.2.8"
-  resolved "https://registry.yarnpkg.com/@girder/components/-/components-2.2.8.tgz#8ea11f5a27ae59af6248c57bc5ae0ea17dd89d26"
-  integrity sha512-Sj13UHk1linrzr9LyQ2JTH/ZwCjr0RnE83AmCJ5HO5fZEKdGv+jT/662zWK6wr8oO/mKbQcOtvsGfF8UTGA0Dg==
+"@girder/components@^2.2.9":
+  version "2.2.9"
+  resolved "https://registry.yarnpkg.com/@girder/components/-/components-2.2.9.tgz#e902cc297a4b39f973e622bf9872f3f51822473b"
+  integrity sha512-yV0N6Xg2mk0ia0vQFndsWQgDIEHOHFQUQrCLD5lmYUqsAqEJac8lVoSm7gbeCMtmtii7FPERb0ZqjGaTa0FOgA==
   dependencies:
     "@mdi/font" "^5.3.45"
     axios "^0.19.2"
@@ -1870,6 +1870,13 @@ axios@^0.19.2:
   integrity sha512-fjgm5MvRHLhx+osE2xoekY70AhARk3a6hkN+3Io1jc00jtquGvxYlKlsFUhmUET0V5te6CcZI7lcv2Ym61mjHA==
   dependencies:
     follow-redirects "1.5.10"
+
+axios@^0.20.0:
+  version "0.20.0"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-0.20.0.tgz#057ba30f04884694993a8cd07fa394cff11c50bd"
+  integrity sha512-ANA4rr2BDcmmAQLOKft2fufrtuvlqR+cXNNinUmvfeSNCOF98PZL+7M/v1zIdGo7OLjEA9J2gXJL+j4zGsl0bA==
+  dependencies:
+    follow-redirects "^1.10.0"
 
 babel-eslint@^10.1.0:
   version "10.1.0"
@@ -3190,6 +3197,13 @@ dir-glob@^2.0.0, dir-glob@^2.2.2:
   dependencies:
     path-type "^3.0.0"
 
+django-s3-file-field@^0.0.17:
+  version "0.0.17"
+  resolved "https://registry.yarnpkg.com/django-s3-file-field/-/django-s3-file-field-0.0.17.tgz#0561db463409f520ca247a6e8d53b3c416e0929d"
+  integrity sha512-lo7KO7bHgQWHQaQ/IfEpr02ddD6V9wLP4eH0LPs1lhHBdGWkHTt3FYxnnVzytsdxKshn7JBRbvm3O4CdIIXo4Q==
+  dependencies:
+    axios "^0.20.0"
+
 dns-equal@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/dns-equal/-/dns-equal-1.0.0.tgz#b39e7f1da6eb0a75ba9c17324b34753c47e0654d"
@@ -4068,7 +4082,7 @@ follow-redirects@1.5.10:
   dependencies:
     debug "=3.1.0"
 
-follow-redirects@^1.0.0:
+follow-redirects@^1.0.0, follow-redirects@^1.10.0:
   version "1.13.0"
   resolved "https://registry.yarnpkg.com/follow-redirects/-/follow-redirects-1.13.0.tgz#b42e8d93a2a7eea5ed88633676d6597bc8e384db"
   integrity sha512-aq6gF1BEKje4a9i9+5jimNFIpq4Q1WiwBToeRK5NvZBd/TRsmW8BsJfOEGkr76TbOyPVD3OVDN910EcUNtRYEA==

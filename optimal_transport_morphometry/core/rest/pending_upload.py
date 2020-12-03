@@ -15,6 +15,7 @@ class PendingUploadSerializer(serializers.ModelSerializer):
 
 class PendingUploadListRequestSerializer(serializers.Serializer):
     batch = serializers.IntegerField()
+    name = serializers.CharField(required=False)
 
 
 class PendingUploadViewSet(ReadOnlyModelViewSet):
@@ -33,6 +34,9 @@ class PendingUploadViewSet(ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         batch = get_object_or_404(UploadBatch, pk=serializer.validated_data['batch'])
         qs = self.queryset.filter(batch=batch)
+        if 'name' in serializer.validated_data:
+            qs = qs.filter(name=serializer.validated_data['name'])
+
         page = self.paginate_queryset(qs)
         serializer = self.get_serializer(page, many=True)
         return self.get_paginated_response(serializer.data)

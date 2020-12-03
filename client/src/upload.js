@@ -1,36 +1,50 @@
+import S3FFClient from 'django-s3-file-field';
 import UploadBase from '@girder/components/src/utils/UploadBase';
 
-class CSVUploadHandler extends UploadBase {
+class BatchCSVUploadHandler extends UploadBase {
   async start() {
     const fd = new FormData();
     fd.append('csvfile', this.file);
     fd.append('dataset', this.parent.datasetId);
+
     this.progress({ indeterminate: true });
-    const result = (await this.$rest.post('upload_batches', fd, {
-      onUploadProgress: (e) => this.progress({
-        indeterminate: !e.lengthComputable,
-        current: e.loaded,
-        size: e.total,
-      }),
+
+    return (await this.$rest.post('upload_batches', fd, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })).data;
+  }
+}
 
-    this.progress({
-      indeterminate: false,
-      size: this.file.size,
-      current: this.file.size,
-    });
-
-    return result;
+class FileUploadHandler extends UploadBase {
+  constructor(file, opts) {
+    super(file, opts);
+    this.s3FFClient = new S3FFClient(opts.$rest.defaults.baseURL + 's3-upload');
   }
 
-  async resume() {
-    return this.start();
+  async start() {
+    const resp = await this.$rest.get('pending_uploads', {
+      params: {
+        batch: this.parent.batchId,
+        name: this.file.name,
+      },
+    });
+    if (resp.data.results.length === 0) {
+      throw new Error(`There is no pending upload with the name "${this.file.name}".`);
+    }
+
+    const pendingUpload = resp.data.results[0].id;
+    const data = await this.s3FFClient.uploadFile(this.file, this.parent.fieldId);
+
+    return (await this.$rest.post('images', {
+      pending_upload: pendingUpload,
+      object_key: data.value,
+    })).data;
   }
 }
 
 export {
-  CSVUploadHandler,
+  BatchCSVUploadHandler,
+  FileUploadHandler,
 };
