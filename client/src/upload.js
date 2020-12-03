@@ -31,10 +31,17 @@ class FileUploadHandler extends UploadBase {
       },
     });
     if (resp.data.results.length === 0) {
-      throw new Error(`There is no pending upload with the name "${this.file.name}".`);
+      throw {
+        response: {
+          data: {
+            message: `There is no pending upload with the name "${this.file.name}".`
+          },
+        },
+      };
     }
 
     const pendingUpload = resp.data.results[0].id;
+    // TODO progress
     const data = await this.s3FFClient.uploadFile(this.file, this.parent.fieldId);
 
     return (await this.$rest.post('images', {
