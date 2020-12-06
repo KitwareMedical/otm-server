@@ -19,10 +19,12 @@ class ImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['type', 'dataset', 'patient', 'metadata']
 
 
-class CreateImageSerializer(serializers.Serializer):
+class CreateImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = ['blob', 'pending_upload']
+
     pending_upload = serializers.IntegerField()
-    # TODO this will require a special deserializer
-    object_key = serializers.CharField()
 
 
 class ImageViewSet(ModelViewSet):
@@ -49,10 +51,11 @@ class ImageViewSet(ModelViewSet):
         serializer = CreateImageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         upload = get_object_or_404(PendingUpload, pk=serializer.validated_data['pending_upload'])
-        object_key = serializer.validated_data['object_key']
+        blob = serializer.validated_data['blob']
+
         # TODO validate existence of key in storage
         image = Image.objects.create(
-            blob=object_key, patient=upload.patient, name=upload.name, metadata=upload.metadata
+            blob=blob, patient=upload.patient, name=upload.name, metadata=upload.metadata
         )
         upload.delete()
         serializer = self.get_serializer(image)

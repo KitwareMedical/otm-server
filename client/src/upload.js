@@ -46,7 +46,7 @@ class FileUploadHandler extends UploadBase {
 
     return (await this.$rest.post('images', {
       pending_upload: pendingUpload,
-      object_key: data.value,
+      blob: data.value,
     })).data;
   }
 }
