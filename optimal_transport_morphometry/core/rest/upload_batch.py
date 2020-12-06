@@ -3,8 +3,7 @@ import codecs
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import parsers, serializers
-from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -32,14 +31,12 @@ class CreateBatchSerializer(serializers.Serializer):
 class UploadBatchViewSet(ModelViewSet):
     queryset = UploadBatch.objects.all()
 
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [AllowAny]
     serializer_class = UploadBatchSerializer
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser]
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['dataset']
-
-    pagination_class = LimitOffsetPagination
 
     def create(self, request):
         serializer = CreateBatchSerializer(data=request.data)
