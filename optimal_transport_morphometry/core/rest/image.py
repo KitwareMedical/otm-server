@@ -55,7 +55,11 @@ class ImageViewSet(ModelViewSet):
 
         # TODO validate existence of key in storage
         image = Image.objects.create(
-            blob=blob, patient=upload.patient, name=upload.name, metadata=upload.metadata
+            blob=blob,
+            patient=upload.patient,
+            name=upload.name,
+            metadata=upload.metadata,
+            dataset=upload.batch.dataset,
         )
         upload.delete()
         serializer = self.get_serializer(image)
