@@ -57,7 +57,7 @@ setup(
         'sentry-sdk',
         # Development-only
         'django-debug-toolbar',
-        'django-minio-storage',
+        'django-minio-storage>=0.3.10',
     ],
     extras_require={'dev': ['ipython', 'tox']},
 )
