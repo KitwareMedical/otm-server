@@ -14,7 +14,7 @@ from composed_configuration import (
 _pkg = 'optimal_transport_morphometry'
 
 
-class OptimalTransportMorphometryConfig(ConfigMixin):
+class OptimalTransportMorphometryMixin(ConfigMixin):
     WSGI_APPLICATION = f'{_pkg}.wsgi.application'
     ROOT_URLCONF = f'{_pkg}.urls'
 
@@ -33,19 +33,19 @@ class OptimalTransportMorphometryConfig(ConfigMixin):
         )
 
 
-class DevelopmentConfiguration(OptimalTransportMorphometryConfig, DevelopmentBaseConfiguration):
+class DevelopmentConfiguration(OptimalTransportMorphometryMixin, DevelopmentBaseConfiguration):
     pass
 
 
-class TestingConfiguration(OptimalTransportMorphometryConfig, TestingBaseConfiguration):
+class TestingConfiguration(OptimalTransportMorphometryMixin, TestingBaseConfiguration):
     pass
 
 
-class ProductionConfiguration(OptimalTransportMorphometryConfig, ProductionBaseConfiguration):
+class ProductionConfiguration(OptimalTransportMorphometryMixin, ProductionBaseConfiguration):
     pass
 
 
 class HerokuProductionConfiguration(
-    OptimalTransportMorphometryConfig, HerokuProductionBaseConfiguration
+    OptimalTransportMorphometryMixin, HerokuProductionBaseConfiguration
 ):
     pass
