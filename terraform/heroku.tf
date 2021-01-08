@@ -1,5 +1,5 @@
 data "heroku_team" "heroku" {
-  name = "kitware-otm"
+  name = "kitware"
 }
 
 module "django" {
