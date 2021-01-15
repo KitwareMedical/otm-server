@@ -13,12 +13,12 @@ def preprocess_images(atlas_id: int, dataset_id: int):
     atlas = models.Atlas.objects.get(pk=atlas_id)
     dataset = models.Dataset.objects.get(pk=dataset_id)
 
-    with NamedTemporaryFile(suffix=atlas.name) as tmp, atlas.blob.open() as blob:
+    with NamedTemporaryFile(suffix='atlas.nii') as tmp, atlas.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
         atlas_img = ants.image_read(tmp.name)
 
-    for image in dataset.images:
+    for image in dataset.images.all():
         with NamedTemporaryFile(suffix=image.name) as tmp, image.blob.open() as blob:
             for chunk in blob.chunks():
                 tmp.write(chunk)

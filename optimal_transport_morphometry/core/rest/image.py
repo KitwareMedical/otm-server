@@ -34,7 +34,7 @@ class ImageViewSet(ModelViewSet):
     serializer_class = ImageSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
-    filterset_fields = ['name']
+    filterset_fields = ['dataset']
 
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):

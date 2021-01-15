@@ -1,6 +1,6 @@
 from django_filters import rest_framework as filters
 from rest_framework import serializers
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny
 from rest_framework.viewsets import ModelViewSet
 
 from optimal_transport_morphometry.core.models import Dataset
@@ -19,7 +19,7 @@ class CreateBatchSerializer(serializers.Serializer):
 class DatasetViewSet(ModelViewSet):
     queryset = Dataset.objects.all()
 
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [AllowAny]
     serializer_class = DatasetSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
