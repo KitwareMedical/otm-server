@@ -12,6 +12,7 @@ router.register(r'atlases', rest.AtlasViewSet)
 router.register(r'datasets', rest.DatasetViewSet)
 router.register(r'images', rest.ImageViewSet)
 router.register(r'pending_uploads', rest.PendingUploadViewSet)
+router.register(r'preprocessing', rest.PreprocessingViewSet)
 router.register(r'upload_batches', rest.UploadBatchViewSet)
 
 # OpenAPI generation
