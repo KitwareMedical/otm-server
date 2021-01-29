@@ -3,6 +3,7 @@ from tempfile import NamedTemporaryFile
 import ants
 from celery import shared_task
 from django.core.files import File
+from django.db import transaction
 import numpy as np
 
 from optimal_transport_morphometry.core import models
@@ -10,7 +11,8 @@ from optimal_transport_morphometry.core import models
 
 @shared_task()
 def preprocess_images(
-    atlas_id: int, atlas_csf_id: int, atlas_grey_id: int, atlas_white_id: int, dataset_id: int
+    atlas_id: int, atlas_csf_id: int, atlas_grey_id: int, atlas_white_id: int, dataset_id: int,
+    replace: bool = False
 ):
     atlas = models.Atlas.objects.get(pk=atlas_id)
     atlas_csf = models.Atlas.objects.get(pk=atlas_csf_id)
@@ -48,7 +50,10 @@ def preprocess_images(
     mask_view[mask_view > 0] = 1
 
     for image in dataset.images.all():
-        # TODO clear out any existing artifacts for this atlas and image ID
+        if replace:
+            _delete_preprocessing_artifacts(image)
+        elif _already_preprocessed(image):
+            continue
         with NamedTemporaryFile(suffix=image.name) as tmp, image.blob.open() as blob:
             for chunk in blob.chunks():
                 tmp.write(chunk)
@@ -87,3 +92,16 @@ def preprocess_images(
             del seg
             seg_model.blob = File(tmp, name='segmented.nii')
             seg_model.save()
+
+
+@transaction.atomic
+def _delete_preprocessing_artifacts(image: models.Image) -> None:
+    for model in [models.JacobianImage, models.SegmentedImage, models.RegisteredImage]:
+        model.objects.filter(source_image=image).delete()
+
+
+def _already_preprocessed(image: models.Image) -> bool:
+    return all(
+        model.objects.filter(source_image=image).count() > 0
+        for model in [models.JacobianImage, models.SegmentedImage, models.RegisteredImage]
+    )

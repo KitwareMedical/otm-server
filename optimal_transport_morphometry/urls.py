@@ -11,8 +11,11 @@ router = routers.SimpleRouter(trailing_slash=False)
 router.register(r'atlases', rest.AtlasViewSet)
 router.register(r'datasets', rest.DatasetViewSet)
 router.register(r'images', rest.ImageViewSet)
+router.register(r'jacobian_images', rest.JacobianImageViewSet)
 router.register(r'pending_uploads', rest.PendingUploadViewSet)
 router.register(r'preprocessing', rest.PreprocessingViewSet)
+router.register(r'registered_images', rest.RegisteredImageViewSet)
+router.register(r'segmented_images', rest.SegmentedImageViewSet)
 router.register(r'upload_batches', rest.UploadBatchViewSet)
 
 # OpenAPI generation
