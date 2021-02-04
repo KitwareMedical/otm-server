@@ -11,8 +11,13 @@ from optimal_transport_morphometry.core import models
 
 @shared_task()
 def preprocess_images(
-    atlas_id: int, atlas_csf_id: int, atlas_grey_id: int, atlas_white_id: int, dataset_id: int,
-    replace: bool = False
+    atlas_id: int,
+    atlas_csf_id: int,
+    atlas_grey_id: int,
+    atlas_white_id: int,
+    dataset_id: int,
+    replace: bool = False,
+    downsample: float = 3.0,
 ):
     atlas = models.Atlas.objects.get(pk=atlas_id)
     atlas_csf = models.Atlas.objects.get(pk=atlas_csf_id)
@@ -80,7 +85,6 @@ def preprocess_images(
             ants.image_write(jac_img, tmp.name)
             jac_model.blob = File(tmp, name='jacobian.nii')
             jac_model.save()
-        del jac_img
 
         print(f'Runnning segmentation: {image.name}')
         seg = ants.prior_based_segmentation(reg_img, priors, mask)
@@ -89,19 +93,50 @@ def preprocess_images(
         seg_model = models.SegmentedImage(source_image=image, atlas=atlas)
         with NamedTemporaryFile(suffix='segmented.nii') as tmp:
             ants.image_write(seg['segmentation'], tmp.name)
-            del seg
             seg_model.blob = File(tmp, name='segmented.nii')
             seg_model.save()
+
+        print(f'Creating feature image: {image.name}')
+        seg_img_view = seg['segmentation'].view()
+        feature_img = seg['segmentation'].copy()
+        feature_img_view = feature_img.view()
+        feature_img_view.fill(0)
+        feature_img_view[seg_img_view == 3] = 1  # 3 is white matter label
+
+        intensity_img_view = jac_img.view()
+        feature_img_view *= intensity_img_view
+
+        if downsample > 1:
+            shape = np.round(np.asarray(feature_img.shape) / downsample)
+            feature_img = ants.resample_image(feature_img, shape, True)
+
+        feature_model = models.FeatureImage(
+            source_image=image, atlas=atlas, downsample_factor=downsample
+        )
+        with NamedTemporaryFile(suffix='feature.nii') as tmp:
+            ants.image_write(feature_img, tmp.name)
+            feature_model.blob = File(tmp, name='feature.nii')
+            feature_model.save()
 
 
 @transaction.atomic
 def _delete_preprocessing_artifacts(image: models.Image) -> None:
-    for model in [models.JacobianImage, models.SegmentedImage, models.RegisteredImage]:
+    for model in [
+        models.JacobianImage,
+        models.SegmentedImage,
+        models.RegisteredImage,
+        models.FeatureImage,
+    ]:
         model.objects.filter(source_image=image).delete()
 
 
 def _already_preprocessed(image: models.Image) -> bool:
     return all(
         model.objects.filter(source_image=image).count() > 0
-        for model in [models.JacobianImage, models.SegmentedImage, models.RegisteredImage]
+        for model in [
+            models.JacobianImage,
+            models.SegmentedImage,
+            models.RegisteredImage,
+            models.FeatureImage,
+        ]
     )

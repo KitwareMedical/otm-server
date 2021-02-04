@@ -6,12 +6,13 @@ from .atlas import Atlas
 from .image import Image
 
 
-class JacobianImage(TimeStampedModel):
+class FeatureImage(TimeStampedModel):
     blob = S3FileField()
     source_image = models.ForeignKey(
         Image,
         on_delete=models.CASCADE,
-        related_name='jacobian_images',
+        related_name='feature_images',
         db_index=True,
     )
-    atlas = models.ForeignKey(Atlas, on_delete=models.PROTECT, related_name='jacobian_images')
+    atlas = models.ForeignKey(Atlas, on_delete=models.PROTECT, related_name='feature_images')
+    downsample_factor = models.FloatField()
