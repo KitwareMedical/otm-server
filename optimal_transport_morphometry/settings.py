@@ -29,6 +29,8 @@ class OptimalTransportMorphometryMixin(ConfigMixin):
         configuration.REST_FRAMEWORK.update(
             {
                 'DEFAULT_PAGINATION_CLASS': f'{_pkg}.core.pagination.BoundedLimitOffsetPagination',
+                # TODO we can remove the line below once OAuth login is working in client
+                'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
             }
         )
 
