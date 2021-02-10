@@ -4,7 +4,7 @@ data "heroku_team" "heroku" {
 
 module "django" {
   source  = "girder/django/heroku"
-  version = "0.5.0"
+  version = "0.8.0"
 
   project_slug     = "kitware-otm"
   route53_zone_id  = data.aws_route53_zone.kitware_otm.zone_id

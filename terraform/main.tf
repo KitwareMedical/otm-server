@@ -1,7 +1,6 @@
 
 terraform {
   backend "remote" {
-    hostname     = "app.terraform.io"
     organization = "kitware-otm"
 
     workspaces {
