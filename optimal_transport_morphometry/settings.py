@@ -22,10 +22,16 @@ class OptimalTransportMorphometryMixin(ConfigMixin):
 
     @staticmethod
     def before_binding(configuration: ComposedConfiguration) -> None:
-        configuration.INSTALLED_APPS += [
+        # Install local apps first, to ensure any overridden resources are found first
+        configuration.INSTALLED_APPS = [
             f'{_pkg}.core.apps.CoreConfig',
+        ] + configuration.INSTALLED_APPS
+
+        # Install additional apps
+        configuration.INSTALLED_APPS += [
             's3_file_field',
         ]
+
         configuration.REST_FRAMEWORK.update(
             {
                 'DEFAULT_PAGINATION_CLASS': f'{_pkg}.core.pagination.BoundedLimitOffsetPagination',
