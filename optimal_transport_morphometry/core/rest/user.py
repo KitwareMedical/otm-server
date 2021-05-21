@@ -14,6 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
             'username',
         ]
 
+
 class UserViewSet(GenericViewSet):
     queryset = User.objects.all()
     permission_classes = [AllowAny]
