@@ -7,6 +7,7 @@ from .preprocess import PreprocessingViewSet
 from .registered_image import RegisteredImageViewSet
 from .segmented_image import SegmentedImageViewSet
 from .upload_batch import UploadBatchViewSet
+from .user import UserViewSet
 
 __all__ = [
     'AtlasViewSet',
@@ -19,4 +20,5 @@ __all__ = [
     'RegisteredImageViewSet',
     'SegmentedImageViewSet',
     'UploadBatchViewSet',
+    'UserViewSet',
 ]
