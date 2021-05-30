@@ -10,6 +10,7 @@ from optimal_transport_morphometry.core import rest
 router = routers.SimpleRouter(trailing_slash=False)
 router.register(r'atlases', rest.AtlasViewSet)
 router.register(r'datasets', rest.DatasetViewSet)
+router.register(r'feature_images', rest.FeatureImageViewSet)
 router.register(r'images', rest.ImageViewSet)
 router.register(r'jacobian_images', rest.JacobianImageViewSet)
 router.register(r'pending_uploads', rest.PendingUploadViewSet)
