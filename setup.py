@@ -46,6 +46,7 @@ setup(
         'django-admin-display',
         'django-allauth',
         'django-cleanup',
+        'django-click',
         'django-configurations[database,email]',
         'django-extensions',
         'django-filter',
