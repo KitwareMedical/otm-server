@@ -21,5 +21,8 @@ class PendingUpload(models.Model):
 
 @receiver(models.signals.post_delete, sender=PendingUpload)
 def _on_delete(sender: Type[PendingUpload], instance: PendingUpload, **kwargs):
-    if instance.batch.pending_uploads.count() == 0:
-        instance.batch.delete()
+    try:
+        if instance.batch.pending_uploads.count() == 0:
+            instance.batch.delete()
+    except UploadBatch.DoesNotExist:
+        pass
