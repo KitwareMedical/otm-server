@@ -85,3 +85,13 @@ Useful sub-commands include:
 
 To automatically reformat all code to comply with
 some (but not all) of the style checks, run `tox -e format`.
+
+## Database seeding
+
+Developers should run the following command to generate a dataset and relevant
+image data in their dev instance:
+
+`docker-compose run --rm django ./manage.py populate_db sample_data/oasis_small.csv`
+
+For now, this ensures the existence of a test dataset, and generates a pending upload
+batch into it.
