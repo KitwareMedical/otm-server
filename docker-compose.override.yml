@@ -20,7 +20,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: ./dev/django.Dockerfile
+      dockerfile: ./dev/celery.Dockerfile
     command: [
       "celery",
       "--app", "optimal_transport_morphometry.celery",
