@@ -3,42 +3,43 @@ FROM ubuntu:latest
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system librarires for Python and R
-RUN apt-get clean && apt-get update && \
+RUN apt clean && apt-get update && \
     apt-get install --no-install-recommends --yes \
-        build-essential \
-        ca-certificates \
-        dpkg-dev \
-		gcc \
-		libbluetooth-dev \
-		libbz2-dev \
-		libc6-dev \
-        libcurl4-gnutls-dev \
-		libexpat1-dev \
-		libffi-dev \
-		libgdbm-dev \
-		liblzma-dev \
-		libncursesw5-dev \
-        libpq-dev \
-		libreadline-dev \
-		libsqlite3-dev \
-		libssl-dev \
-        libxml2-dev \
-		make \
-        netbase \
-		tk-dev \
-		uuid-dev \
-		wget \
-		xz-utils \
-		zlib1g-dev \
-        python3 python3-pip python3-setuptools python3-dev \
-        littler \
-        r-base \
-        r-base-dev \
-        r-recommended \
-        texlive-latex-base texlive-latex-extra \
-        libpng-dev \
-        parallel \
-        xorg libx11-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev && \
+    build-essential \
+    ca-certificates \
+    dpkg-dev \
+    git \
+    gcc \
+    libbluetooth-dev \
+    libbz2-dev \
+    libc6-dev \
+    libcurl4-gnutls-dev \
+    libexpat1-dev \
+    libffi-dev \
+    libgdbm-dev \
+    liblzma-dev \
+    libncursesw5-dev \
+    libpq-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    libxml2-dev \
+    make \
+    netbase \
+    tk-dev \
+    uuid-dev \
+    wget \
+    xz-utils \
+    zlib1g-dev \
+    python3 python3-pip python3-setuptools python3-dev \
+    littler \
+    r-base \
+    r-base-dev \
+    r-recommended \
+    texlive-latex-base texlive-latex-extra \
+    libpng-dev \
+    parallel \
+    xorg libx11-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE 1
