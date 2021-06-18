@@ -27,7 +27,6 @@ RUN pip install --editable /opt/django-project[dev]
 RUN git clone https://github.com/KitwareMedical/UTM /opt/UTM
 COPY ./install.R /opt/django-project/install.R
 RUN Rscript /opt/django-project/install.R
-# RUN /bin/bash -c "source /opt/UTM/Scripts/Packages/install-local.sh" 
 
 # Use a directory name which will never be an import name, as isort considers this as first-party.
 WORKDIR /opt/django-project

@@ -1,4 +1,8 @@
-from tempfile import NamedTemporaryFile
+import csv
+import subprocess
+import os
+from tempfile import NamedTemporaryFile, TemporaryDirectory
+from typing import List, Dict
 
 import ants
 from celery import shared_task
@@ -64,10 +68,10 @@ def preprocess_images(
                 tmp.write(chunk)
             input_img = ants.image_read(tmp.name)
 
-        print(f'Runnning N4 bias correction: {image.name}')
+        print(f'Running N4 bias correction: {image.name}')
         im_n4 = ants.n4_bias_field_correction(input_img)
         del input_img
-        print(f'Runnning registration: {image.name}')
+        print(f'Running registration: {image.name}')
         reg = ants.registration(atlas_img, im_n4)
         del im_n4
         jac_img = ants.create_jacobian_determinant_image(atlas_img, reg['fwdtransforms'][0], 1)
@@ -86,7 +90,7 @@ def preprocess_images(
             jac_model.blob = File(tmp, name='jacobian.nii')
             jac_model.save()
 
-        print(f'Runnning segmentation: {image.name}')
+        print(f'Running segmentation: {image.name}')
         seg = ants.prior_based_segmentation(reg_img, priors, mask)
         del reg_img
 
@@ -119,6 +123,45 @@ def preprocess_images(
             feature_model.save()
 
 
+@shared_task()
+def run_utm(dataset_id: int):
+    # using default_configuration.yml in UTM repo for now
+    # TODO: load config.yml file as well
+
+    dataset = models.Dataset.objects.get(pk=dataset_id)
+    output_folder = '/opt/django-project/UTM_results'
+
+    with TemporaryDirectory() as tmpdir:
+        variables = []
+        for image in dataset.images.all():
+            meta = image.metadata
+            meta['name'] = meta.pop('ID')
+            variables.append(meta)
+
+            feature_image = image.feature_images.first()
+            filename = f'{tmpdir}/{feature_image.id}.nii'
+            with image.blob.open() as blob, open(filename, 'wb') as fd:
+                for chunk in blob.chunks():
+                    fd.write(chunk)
+        
+        variables_filename = f'{tmpdir}/variables.csv'
+        headers = ['name'] + list(variables[0].keys() - 'name')
+        with open(variables_filename, 'w') as csvfile:
+            _write_csv(csvfile, headers, variables)
+
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        
+        subprocess.run([
+            'Rscript', 
+            '/opt/UTM/Scripts/run.utm.barycenter.R',
+            tmpdir,
+            variables_filename,
+            '--working.folder',
+            output_folder
+        ])
+
+
 @transaction.atomic
 def _delete_preprocessing_artifacts(image: models.Image) -> None:
     for model in [
@@ -140,3 +183,8 @@ def _already_preprocessed(image: models.Image) -> bool:
             models.FeatureImage,
         ]
     )
+
+def _write_csv(csvfile: File, headers: List[str], rows: List[dict]):
+    writer = csv.DictWriter(csvfile, fieldnames=headers)
+    writer.writeheader()
+    writer.writerows(rows)
