@@ -9,15 +9,21 @@ from rest_framework.viewsets import GenericViewSet
 
 from optimal_transport_morphometry.core.models import RegisteredImage
 
+from .atlas import AtlasSerializer
+from .image import ImageSerializer
+
 
 class RegisteredImageSerializer(serializers.ModelSerializer):
+    atlas = AtlasSerializer()
+    source_image = ImageSerializer()
+
     class Meta:
         model = RegisteredImage
-        fields = ['id', 'source_image', 'atlas', 'created', 'modified']
+        fields = ['id', 'source_image', 'atlas', 'created', 'modified', 'registration_type']
 
 
 class RegisteredImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = RegisteredImage.objects.all()
+    queryset = RegisteredImage.objects.select_related('atlas', 'source_image')
 
     permission_classes = [AllowAny]
     serializer_class = RegisteredImageSerializer
