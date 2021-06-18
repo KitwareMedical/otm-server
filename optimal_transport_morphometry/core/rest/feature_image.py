@@ -9,15 +9,21 @@ from rest_framework.viewsets import GenericViewSet
 
 from optimal_transport_morphometry.core.models import FeatureImage
 
+from .atlas import AtlasSerializer
+from .image import ImageSerializer
+
 
 class FeatureImageSerializer(serializers.ModelSerializer):
+    atlas = AtlasSerializer()
+    source_image = ImageSerializer()
+
     class Meta:
         model = FeatureImage
         fields = ['id', 'source_image', 'atlas', 'created', 'modified', 'downsample_factor']
 
 
 class FeatureImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = FeatureImage.objects.all()
+    queryset = FeatureImage.objects.select_related('atlas', 'source_image')
 
     permission_classes = [AllowAny]
     serializer_class = FeatureImageSerializer

@@ -9,15 +9,21 @@ from rest_framework.viewsets import GenericViewSet
 
 from optimal_transport_morphometry.core.models import JacobianImage
 
+from .atlas import AtlasSerializer
+from .image import ImageSerializer
+
 
 class JacobianImageSerializer(serializers.ModelSerializer):
+    atlas = AtlasSerializer()
+    source_image = ImageSerializer()
+
     class Meta:
         model = JacobianImage
         fields = ['id', 'source_image', 'atlas', 'created', 'modified']
 
 
 class JacobianImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = JacobianImage.objects.all()
+    queryset = JacobianImage.objects.select_related('atlas', 'source_image')
 
     permission_classes = [AllowAny]
     serializer_class = JacobianImageSerializer

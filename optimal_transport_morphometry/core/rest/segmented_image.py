@@ -9,15 +9,21 @@ from rest_framework.viewsets import GenericViewSet
 
 from optimal_transport_morphometry.core.models import SegmentedImage
 
+from .atlas import AtlasSerializer
+from .image import ImageSerializer
+
 
 class SegmentedImageSerializer(serializers.ModelSerializer):
+    atlas = AtlasSerializer()
+    source_image = ImageSerializer()
+
     class Meta:
         model = SegmentedImage
         fields = ['id', 'source_image', 'atlas', 'created', 'modified']
 
 
 class SegmentedImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = SegmentedImage.objects.all()
+    queryset = SegmentedImage.objects.select_related('atlas', 'source_image')
 
     permission_classes = [AllowAny]
     serializer_class = SegmentedImageSerializer
