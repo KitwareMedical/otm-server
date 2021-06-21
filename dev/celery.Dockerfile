@@ -1,4 +1,4 @@
-FROM rocker/rstudio:4.1.0
+FROM rocker/shiny:4.1.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
