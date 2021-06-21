@@ -1,5 +1,7 @@
 import csv
+import logging
 import subprocess
+import sys
 import os
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import List, Dict
@@ -129,29 +131,29 @@ def run_utm(dataset_id: int):
     # TODO: load config.yml file as well
 
     dataset = models.Dataset.objects.get(pk=dataset_id)
-    output_folder = '/opt/django-project/UTM_results'
+    output_folder = '/opt/django-project/UTM_results' # hard coded for now
 
     with TemporaryDirectory() as tmpdir:
         variables = []
         for image in dataset.images.all():
             meta = image.metadata
-            meta['name'] = meta.pop('ID')
+            meta['name'] = f'{meta.pop("ID")}.nii'  # rename ID to name and add extension
             variables.append(meta)
 
             feature_image = image.feature_images.first()
-            filename = f'{tmpdir}/{feature_image.id}.nii'
-            with image.blob.open() as blob, open(filename, 'wb') as fd:
+            filename = f'{tmpdir}/{meta["name"]}'
+            with feature_image.blob.open() as blob, open(filename, 'wb') as fd:
                 for chunk in blob.chunks():
                     fd.write(chunk)
         
         variables_filename = f'{tmpdir}/variables.csv'
-        headers = ['name'] + list(variables[0].keys() - 'name')
+        headers = variables[0].keys()
         with open(variables_filename, 'w') as csvfile:
             _write_csv(csvfile, headers, variables)
 
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
-        
+
         subprocess.run([
             'Rscript', 
             '/opt/UTM/Scripts/run.utm.barycenter.R',

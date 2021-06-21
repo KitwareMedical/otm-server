@@ -8,7 +8,7 @@ from optimal_transport_morphometry.core.models import Dataset
 from optimal_transport_morphometry.core.tasks import run_utm
 
 
-class UTMSerializer(serializers.Serializer):
+class UTMAnalysisSerializer(serializers.Serializer):
     dataset = serializers.IntegerField()
 
 
@@ -16,11 +16,11 @@ class PreprocessResponseSerializer(serializers.Serializer):
     task_id = serializers.CharField()
 
 
-class UTMViewSet(GenericViewSet):
+class UTMAnalysisViewSet(GenericViewSet):
     queryset = Dataset.objects.all()
 
     permission_classes = [AllowAny]
-    serializer_class = UTMSerializer
+    serializer_class = UTMAnalysisSerializer
 
     def create(self, request):
         serializer = self.get_serializer(data=request.data)

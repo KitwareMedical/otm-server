@@ -9,7 +9,7 @@ from .registered_image import RegisteredImageViewSet
 from .segmented_image import SegmentedImageViewSet
 from .upload_batch import UploadBatchViewSet
 from .user import UserViewSet
-from .utm import UTMViewSet
+from .utm_analysis import UTMAnalysisViewSet
 
 __all__ = [
     'AtlasViewSet',
@@ -24,5 +24,5 @@ __all__ = [
     'SegmentedImageViewSet',
     'UploadBatchViewSet',
     'UserViewSet',
-    'UTMViewSet',
+    'UTMAnalysisViewSet',
 ]
