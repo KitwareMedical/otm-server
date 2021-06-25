@@ -103,6 +103,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# VS Code config
+.vscode/
+
 # SageMath parsed files
 *.sage.py
 

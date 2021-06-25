@@ -22,11 +22,9 @@ services:
       context: .
       dockerfile: ./dev/celery.Dockerfile
     command: [
-      "celery",
-      "--app", "optimal_transport_morphometry.celery",
-      "worker",
-      "--loglevel", "INFO",
-      "--without-heartbeat"
+      "bash", "-c",
+      "/usr/bin/shiny-server /etc/shiny-server/shiny-server.conf &
+      celery --app optimal_transport_morphometry.celery worker --loglevel INFO --without-heartbeat"
     ]
     # Docker Compose does not set the TTY width, which causes Celery errors
     tty: false

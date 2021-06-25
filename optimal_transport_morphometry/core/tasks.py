@@ -1,10 +1,9 @@
 import csv
-import logging
-import subprocess
-import sys
 import os
+import shutil
+import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
-from typing import List, Dict
+from typing import List
 
 import ants
 from celery import shared_task
@@ -131,7 +130,8 @@ def run_utm(dataset_id: int):
     # TODO: load config.yml file as well
 
     dataset = models.Dataset.objects.get(pk=dataset_id)
-    output_folder = '/opt/django-project/UTM_results' # hard coded for now
+    output_folder = f'/srv/shiny-server/utm_{dataset_id}'  # shiny-server directory
+    utm_folder = '/opt/UTM'
 
     with TemporaryDirectory() as tmpdir:
         variables = []
@@ -145,7 +145,7 @@ def run_utm(dataset_id: int):
             with feature_image.blob.open() as blob, open(filename, 'wb') as fd:
                 for chunk in blob.chunks():
                     fd.write(chunk)
-        
+
         variables_filename = f'{tmpdir}/variables.csv'
         headers = variables[0].keys()
         with open(variables_filename, 'w') as csvfile:
@@ -154,14 +154,25 @@ def run_utm(dataset_id: int):
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
 
-        subprocess.run([
-            'Rscript', 
-            '/opt/UTM/Scripts/run.utm.barycenter.R',
-            tmpdir,
-            variables_filename,
-            '--working.folder',
-            output_folder
-        ])
+        # copy necessary R shiny files
+        shutil.copyfile(f'{utm_folder}/Scripts/Shiny/app.R', f'{output_folder}/app.R')
+        shutil.copyfile(
+            f'{utm_folder}/Scripts/Shiny/shiny-help.md', f'{output_folder}/shiny-help.md'
+        )
+        shutil.copyfile(
+            f'{utm_folder}/Scripts/ShinyVtkScripts/render.js', f'{output_folder}/render.js'
+        )
+
+        subprocess.run(
+            [
+                'Rscript',
+                '/opt/UTM/Scripts/run.utm.barycenter.R',
+                tmpdir,
+                variables_filename,
+                '--working.folder',
+                output_folder,
+            ]
+        )
 
 
 @transaction.atomic
@@ -185,6 +196,7 @@ def _already_preprocessed(image: models.Image) -> bool:
             models.FeatureImage,
         ]
     )
+
 
 def _write_csv(csvfile: File, headers: List[str], rows: List[dict]):
     writer = csv.DictWriter(csvfile, fieldnames=headers)
