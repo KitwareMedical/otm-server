@@ -20,19 +20,19 @@ services:
   celery:
     build:
       context: .
-      dockerfile: ./dev/django.Dockerfile
+      dockerfile: ./dev/celery.Dockerfile
     command: [
-      "celery",
-      "--app", "optimal_transport_morphometry.celery",
-      "worker",
-      "--loglevel", "INFO",
-      "--without-heartbeat"
+      "bash", "-c",
+      "/usr/bin/shiny-server /etc/shiny-server/shiny-server.conf &
+      celery --app optimal_transport_morphometry.celery worker --loglevel INFO --without-heartbeat"
     ]
     # Docker Compose does not set the TTY width, which causes Celery errors
     tty: false
     env_file: ./dev/.env.docker-compose
     volumes:
       - .:/opt/django-project
+    ports:
+      - 3838:3838
     depends_on:
       - postgres
       - rabbitmq
