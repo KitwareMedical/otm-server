@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
-from typing import List
+from typing import List, TextIO
 
 import ants
 from celery import shared_task
@@ -123,6 +123,9 @@ def preprocess_images(
             feature_model.blob = File(tmp, name='feature.nii')
             feature_model.save()
 
+    dataset.preprocessing_complete = True
+    dataset.save()
+
 
 @shared_task()
 def run_utm(dataset_id: int):
@@ -163,7 +166,7 @@ def run_utm(dataset_id: int):
             f'{utm_folder}/Scripts/ShinyVtkScripts/render.js', f'{output_folder}/render.js'
         )
 
-        subprocess.run(
+        result = subprocess.run(
             [
                 'Rscript',
                 '/opt/UTM/Scripts/run.utm.barycenter.R',
@@ -173,6 +176,9 @@ def run_utm(dataset_id: int):
                 output_folder,
             ]
         )
+        if result.returncode == 0:
+            dataset.analysis_complete = True
+            dataset.save()
 
 
 @transaction.atomic
@@ -198,7 +204,7 @@ def _already_preprocessed(image: models.Image) -> bool:
     )
 
 
-def _write_csv(csvfile: File, headers: List[str], rows: List[dict]):
+def _write_csv(csvfile: TextIO, headers: List[str], rows: List[dict]):
     writer = csv.DictWriter(csvfile, fieldnames=headers)
     writer.writeheader()
     writer.writerows(rows)

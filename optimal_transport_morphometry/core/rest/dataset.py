@@ -9,7 +9,7 @@ from optimal_transport_morphometry.core.models import Dataset
 class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
-        fields = ['id', 'name', 'description']
+        fields = ['id', 'name', 'description', 'preprocessing_complete', 'analysis_complete']
 
 
 class CreateBatchSerializer(serializers.Serializer):
