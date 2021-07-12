@@ -189,12 +189,12 @@ def _delete_preprocessing_artifacts(image: models.Image) -> None:
         models.RegisteredImage,
         models.FeatureImage,
     ]:
-        model.objects.filter(source_image=image).delete()
+        model.objects.filter(source_image=image).delete()  # type: ignore
 
 
 def _already_preprocessed(image: models.Image) -> bool:
     return all(
-        model.objects.filter(source_image=image).count() > 0
+        model.objects.filter(source_image=image).count() > 0  # type: ignore
         for model in [
             models.JacobianImage,
             models.SegmentedImage,
