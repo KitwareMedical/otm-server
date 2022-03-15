@@ -21,7 +21,8 @@ ENV PYTHONUNBUFFERED 1
 # over top of this directory, the .egg-link in site-packages resolves to the mounted directory
 # and all package modules are importable.
 COPY ./setup.py /opt/django-project/setup.py
-RUN pip install --editable /opt/django-project[dev]
+RUN pip3 install --editable /opt/django-project[dev]
+RUN pip3 install django-s3-file-field[minio]
 
 # Clone UTM R scripts and install packages
 RUN git clone https://github.com/KitwareMedical/UTM /opt/UTM
