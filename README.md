@@ -114,3 +114,17 @@ docker-compose run --rm django ./manage.py populate_db sample_data/oasis_small.c
 
 For now, this ensures the existence of a test dataset, and generates a pending upload
 batch into it.
+
+## Authentication Setup
+
+In order to set up authentication for your local development environment, you need to create an application which will issue a `client_id` to set in your client app. Visit http://localhost:8000/admin/oauth2_provider/application/ and create a new one.
+
+The settings for your new application should be as follows:
+
+* Redirect URLs: http://localhost:8080/ (trailing slash matters)
+* Client type: Public
+* Authorization grant type: Authorization code
+* Client Secret: empty
+* Name: A descriptive name of your choosing
+
+In the client app directory (otm-client, currently a private repository), create a new file `.env.development.local` and set `VUE_APP_OAUTH_CLIENT_ID` to the value found in your application's "Client ID" field. This value represents a new OAuth2 public client ID.
