@@ -9,7 +9,7 @@ This is the simplest configuration for developers to start with.
 1. Run `docker-compose run --rm django ./manage.py migrate`
 2. Run `docker-compose run --rm django ./manage.py createsuperuser`
    and follow the prompts to create your own user
-3. Run `docker-compose run --rm django ./manage.py populate_db sample_data/oasis_small.csv` to seed the database and generate a sample dataset.
+3. Run `docker-compose run --rm django ./manage.py populate_db --include-images sample_data/oasis_small.csv` to seed the database and generate a sample dataset.
 
 ### Run Application
 
