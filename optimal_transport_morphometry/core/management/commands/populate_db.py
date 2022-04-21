@@ -20,8 +20,8 @@ images_dir = root_dir / 'sample_data' / 'images'
 
 @click.command()
 @click.argument('csv', type=click.File())
-@click.option('--dataset-name', default='Test dataset')
-@click.option('--clear', is_flag=True)
+@click.option('--dataset-name', default='Test dataset', help='The name of the dataset to create.')
+@click.option('--clear', is_flag=True, help='Clear all existing upload batches.')
 @click.option('--include-images', is_flag=True, help='Include upload of corresponding images.')
 def command(csv: TextIO, dataset_name: str, clear: bool, include_images: bool) -> None:
     for name in ['grey', 'white', 'csf', 'T1']:
