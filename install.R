@@ -41,4 +41,5 @@ binaries = c(
   "https://github.com/ANTsX/ANTsRCore/releases/download/v0.7.4.9/ANTsRCore_0.7.4.9_R_x86_64-pc-linux-gnu_R4.1.tar.gz",
   "https://github.com/ANTsX/ANTsR/releases/download/v0.5.7.4/ANTsR_0.5.7.4_R_x86_64-pc-linux-gnu_R4.1.tar.gz"
 )
+options(timeout=600) # allow more time for downloads to take place in the installation command below
 install.packages(pkgs = binaries, repo = NULL)
