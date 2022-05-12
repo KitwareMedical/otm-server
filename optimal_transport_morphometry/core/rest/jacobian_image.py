@@ -14,19 +14,25 @@ from .image import ImageSerializer
 
 
 class JacobianImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JacobianImage
+        fields = ['id', 'created', 'modified', 'blob']
+
+
+class ExtendedJacobianImageSerializer(serializers.ModelSerializer):
     atlas = AtlasSerializer()
     source_image = ImageSerializer()
 
     class Meta:
         model = JacobianImage
-        fields = ['id', 'source_image', 'atlas', 'created', 'modified']
+        fields = JacobianImageSerializer.Meta.fields + ['atlas' + 'source_image']
 
 
 class JacobianImageViewSet(ListModelMixin, GenericViewSet):
     queryset = JacobianImage.objects.select_related('atlas', 'source_image')
 
     permission_classes = [AllowAny]
-    serializer_class = JacobianImageSerializer
+    serializer_class = ExtendedJacobianImageSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['source_image', 'source_image__dataset']

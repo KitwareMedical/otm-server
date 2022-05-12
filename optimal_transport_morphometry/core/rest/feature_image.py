@@ -14,12 +14,18 @@ from .image import ImageSerializer
 
 
 class FeatureImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureImage
+        fields = ['id', 'created', 'modified', 'downsample_factor', 'blob']
+
+
+class ExtendedFeatureImageSerializer(serializers.ModelSerializer):
     atlas = AtlasSerializer()
     source_image = ImageSerializer()
 
     class Meta:
         model = FeatureImage
-        fields = ['id', 'source_image', 'atlas', 'created', 'modified', 'downsample_factor']
+        fields = FeatureImageSerializer.Meta.fields + ['atlas', 'source_image']
 
 
 class FeatureImageViewSet(ListModelMixin, GenericViewSet):

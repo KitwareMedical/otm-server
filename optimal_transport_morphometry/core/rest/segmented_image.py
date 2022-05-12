@@ -14,19 +14,25 @@ from .image import ImageSerializer
 
 
 class SegmentedImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SegmentedImage
+        fields = ['id', 'created', 'modified', 'blob']
+
+
+class ExtendedSegmentedImageSerializer(serializers.ModelSerializer):
     atlas = AtlasSerializer()
     source_image = ImageSerializer()
 
     class Meta:
         model = SegmentedImage
-        fields = ['id', 'source_image', 'atlas', 'created', 'modified']
+        fields = SegmentedImageSerializer.Meta.fields + ['atlas', 'source_image']
 
 
 class SegmentedImageViewSet(ListModelMixin, GenericViewSet):
     queryset = SegmentedImage.objects.select_related('atlas', 'source_image')
 
     permission_classes = [AllowAny]
-    serializer_class = SegmentedImageSerializer
+    serializer_class = ExtendedSegmentedImageSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['source_image', 'source_image__dataset']
