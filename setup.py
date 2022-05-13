@@ -36,11 +36,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        (
-            'antspyx @ '
-            'https://github.com/girder/optimal-transport-morphometry/releases/download/1/'
-            'antspyx-0.2.6-cp38-cp38-linux_x86_64.whl'
-        ),
+        'antspyx',
         'celery',
         'django~=3.2',
         'django-admin-display',
