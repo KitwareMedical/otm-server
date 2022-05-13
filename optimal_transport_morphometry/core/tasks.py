@@ -5,7 +5,13 @@ import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import List, TextIO
 
-import ants
+
+# Import ants functions directly to reduce necessary size
+from ants.core.ants_image_io import image_read, image_write
+from ants.utils.bias_correction import n4_bias_field_correction
+from ants.registration import create_jacobian_determinant_image, registration, resample_image
+from ants.segmentation import prior_based_segmentation
+
 from celery import shared_task
 from django.core.files import File
 from django.db import transaction
@@ -34,22 +40,22 @@ def preprocess_images(
     with NamedTemporaryFile(suffix='atlas.nii') as tmp, atlas.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
-        atlas_img = ants.image_read(tmp.name)
+        atlas_img = image_read(tmp.name)
 
     with NamedTemporaryFile(suffix='atlas_csf.nii') as tmp, atlas_csf.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
-        atlas_csf_img = ants.image_read(tmp.name)
+        atlas_csf_img = image_read(tmp.name)
 
     with NamedTemporaryFile(suffix='atlas_grey.nii') as tmp, atlas_grey.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
-        atlas_grey_img = ants.image_read(tmp.name)
+        atlas_grey_img = image_read(tmp.name)
 
     with NamedTemporaryFile(suffix='atlas_white.nii') as tmp, atlas_white.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
-        atlas_white_img = ants.image_read(tmp.name)
+        atlas_white_img = image_read(tmp.name)
 
     print('Creating mask')
     priors = [atlas_csf_img, atlas_grey_img, atlas_white_img]
@@ -67,37 +73,37 @@ def preprocess_images(
         with NamedTemporaryFile(suffix=image.name) as tmp, image.blob.open() as blob:
             for chunk in blob.chunks():
                 tmp.write(chunk)
-            input_img = ants.image_read(tmp.name)
+            input_img = image_read(tmp.name)
 
         print(f'Running N4 bias correction: {image.name}')
-        im_n4 = ants.n4_bias_field_correction(input_img)
+        im_n4 = n4_bias_field_correction(input_img)
         del input_img
         print(f'Running registration: {image.name}')
-        reg = ants.registration(atlas_img, im_n4)
+        reg = registration(atlas_img, im_n4)
         del im_n4
-        jac_img = ants.create_jacobian_determinant_image(atlas_img, reg['fwdtransforms'][0], 1)
+        jac_img = create_jacobian_determinant_image(atlas_img, reg['fwdtransforms'][0], 1)
         jac_img = jac_img.apply(np.abs)
 
         reg_model = models.RegisteredImage(source_image=image, atlas=atlas)
         reg_img = reg['warpedmovout']
         with NamedTemporaryFile(suffix='registered.nii') as tmp:
-            ants.image_write(reg_img, tmp.name)
+            image_write(reg_img, tmp.name)
             reg_model.blob = File(tmp, name='registered.nii')
             reg_model.save()
 
         jac_model = models.JacobianImage(source_image=image, atlas=atlas)
         with NamedTemporaryFile(suffix='jacobian.nii') as tmp:
-            ants.image_write(jac_img, tmp.name)
+            image_write(jac_img, tmp.name)
             jac_model.blob = File(tmp, name='jacobian.nii')
             jac_model.save()
 
         print(f'Running segmentation: {image.name}')
-        seg = ants.prior_based_segmentation(reg_img, priors, mask)
+        seg = prior_based_segmentation(reg_img, priors, mask)
         del reg_img
 
         seg_model = models.SegmentedImage(source_image=image, atlas=atlas)
         with NamedTemporaryFile(suffix='segmented.nii') as tmp:
-            ants.image_write(seg['segmentation'], tmp.name)
+            image_write(seg['segmentation'], tmp.name)
             seg_model.blob = File(tmp, name='segmented.nii')
             seg_model.save()
 
@@ -113,13 +119,13 @@ def preprocess_images(
 
         if downsample > 1:
             shape = np.round(np.asarray(feature_img.shape) / downsample)
-            feature_img = ants.resample_image(feature_img, shape, True)
+            feature_img = resample_image(feature_img, shape, True)
 
         feature_model = models.FeatureImage(
             source_image=image, atlas=atlas, downsample_factor=downsample
         )
         with NamedTemporaryFile(suffix='feature.nii') as tmp:
-            ants.image_write(feature_img, tmp.name)
+            image_write(feature_img, tmp.name)
             feature_model.blob = File(tmp, name='feature.nii')
             feature_model.save()
 
