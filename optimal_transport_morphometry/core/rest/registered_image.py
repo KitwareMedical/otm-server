@@ -14,19 +14,25 @@ from .image import ImageSerializer
 
 
 class RegisteredImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RegisteredImage
+        fields = ['id', 'created', 'modified', 'registration_type', 'blob']
+
+
+class ExtendedRegisteredImageSerializer(serializers.ModelSerializer):
     atlas = AtlasSerializer()
     source_image = ImageSerializer()
 
     class Meta:
         model = RegisteredImage
-        fields = ['id', 'source_image', 'atlas', 'created', 'modified', 'registration_type']
+        fields = RegisteredImageSerializer.Meta.fields + ['atlas', 'source_image']
 
 
 class RegisteredImageViewSet(ListModelMixin, GenericViewSet):
     queryset = RegisteredImage.objects.select_related('atlas', 'source_image')
 
     permission_classes = [AllowAny]
-    serializer_class = RegisteredImageSerializer
+    serializer_class = ExtendedRegisteredImageSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['source_image', 'source_image__dataset']
