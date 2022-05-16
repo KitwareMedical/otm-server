@@ -5,7 +5,6 @@ import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import List, TextIO
 
-
 from celery import shared_task
 from django.core.files import File
 from django.db import transaction

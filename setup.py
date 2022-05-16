@@ -64,6 +64,6 @@ setup(
         'worker': [
             'antspyx',
             'numpy',
-        ]
+        ],
     },
 )

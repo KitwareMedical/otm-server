@@ -1,8 +1,7 @@
+import site
 import tempfile
 import urllib.request
 import zipfile
-import site
-
 
 wheel_url = (
     'https://files.pythonhosted.org/packages/f0/b5'
