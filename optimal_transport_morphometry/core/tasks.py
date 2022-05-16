@@ -5,11 +5,9 @@ import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import List, TextIO
 
-import ants
 from celery import shared_task
 from django.core.files import File
 from django.db import transaction
-import numpy as np
 
 from optimal_transport_morphometry.core import models
 
@@ -24,6 +22,10 @@ def preprocess_images(
     replace: bool = False,
     downsample: float = 3.0,
 ):
+    # Import to avoid need for ants package in API
+    import ants
+    import numpy as np
+
     atlas = models.Atlas.objects.get(pk=atlas_id)
     atlas_csf = models.Atlas.objects.get(pk=atlas_csf_id)
     atlas_grey = models.Atlas.objects.get(pk=atlas_grey_id)
