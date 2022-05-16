@@ -25,7 +25,7 @@ class ExtendedJacobianImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = JacobianImage
-        fields = JacobianImageSerializer.Meta.fields + ['atlas' + 'source_image']
+        fields = JacobianImageSerializer.Meta.fields + ['atlas', 'source_image']
 
 
 class JacobianImageViewSet(ListModelMixin, GenericViewSet):
