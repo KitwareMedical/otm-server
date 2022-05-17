@@ -77,7 +77,7 @@ def preprocess_images(
         print(f'Running registration: {image.name}')
         reg = ants.registration(atlas_img, im_n4)
         del im_n4
-        jac_img = ants.create_jacobian_determinant_image(atlas_img, reg['fwdtransforms'][0], 1)
+        jac_img = ants.create_jacobian_determinant_image(atlas_img, reg['fwdtransforms'][0], False, True)
         jac_img = jac_img.apply(np.abs)
 
         reg_model = models.RegisteredImage(source_image=image, atlas=atlas)
