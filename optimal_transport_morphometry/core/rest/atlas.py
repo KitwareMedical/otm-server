@@ -12,7 +12,7 @@ from optimal_transport_morphometry.core.models import Atlas
 class AtlasSerializer(serializers.ModelSerializer):
     class Meta:
         model = Atlas
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'blob']
 
 
 class AtlasViewSet(ReadOnlyModelViewSet):
