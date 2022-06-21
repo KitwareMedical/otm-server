@@ -10,3 +10,6 @@ class Dataset(TimeStampedModel, models.Model):
     analysis_complete = models.BooleanField(default=False)
     public = models.BooleanField(default=False)
     owner = models.ForeignKey(User, related_name='datasets_owned', on_delete=models.CASCADE)
+
+    class Meta:
+        permissions = (('collaborator', 'Collaborator'),)

@@ -15,6 +15,28 @@ class UserSerializer(serializers.ModelSerializer):
         ]
 
 
+class ExistingUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+        ]
+
+    # Redeclare username to remove error for exsting users
+    username = serializers.CharField()
+
+    def validate(self, attrs):
+        # Check that username exists
+        username = attrs.get('username')
+        if username and not User.objects.filter(username=username).exists():
+            raise serializers.ValidationError(
+                {'username': f'User with username {username} not found.'}
+            )
+
+        return super().validate(attrs)
+
+
 class UserViewSet(GenericViewSet):
     queryset = User.objects.all()
     permission_classes = [AllowAny]
