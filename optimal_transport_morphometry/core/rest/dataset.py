@@ -1,5 +1,7 @@
 from django_filters import rest_framework as filters
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -16,7 +18,15 @@ from optimal_transport_morphometry.core.rest.segmented_image import SegmentedIma
 class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
-        fields = ['id', 'name', 'description', 'preprocessing_complete', 'analysis_complete']
+        fields = [
+            'id',
+            'name',
+            'description',
+            'public',
+            'preprocessing_complete',
+            'analysis_complete',
+        ]
+        read_only_fields = ['id', 'preprocessing_complete', 'analysis_complete']
 
 
 class ImageGroupSerializer(serializers.ModelSerializer):
@@ -86,3 +96,19 @@ class DatasetViewSet(ModelViewSet):
 
         serializer = ImageGroupSerializer(images, many=True)
         return Response(serializer.data)
+
+    @swagger_auto_schema(
+        operation_description='Create a new dataset.',
+        request_body=DatasetSerializer(),
+        responses={200: DatasetSerializer},
+    )
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            raise serializers.ValidationError('Must be logged in to create a dataset')
+
+        serializer: DatasetSerializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Perform create
+        ds = Dataset.objects.create(**serializer.validated_data, owner=request.user)
+        return Response(DatasetSerializer(ds).data, status=status.HTTP_201_CREATED)
