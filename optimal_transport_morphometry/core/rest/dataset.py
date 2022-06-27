@@ -1,13 +1,15 @@
 from typing import List
 
 from django.contrib.auth.models import User
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from drf_yasg.utils import swagger_auto_schema
-from guardian.shortcuts import assign_perm, get_users_with_perms
-from rest_framework import serializers, status
+from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms
+from rest_framework import exceptions, serializers, status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import SAFE_METHODS, BasePermission
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -91,14 +93,53 @@ class DatasetCollaboratorSerializer(serializers.ModelSerializer):
     username = serializers.CharField()
 
 
-class DatasetViewSet(ModelViewSet):
-    queryset = Dataset.objects.all()
+class DatasetPermissions(BasePermission):
+    def has_permission(self, request: Request, view):
+        # Any user can list or create datasets
+        return True
 
-    permission_classes = [AllowAny]
+    def has_object_permission(self, request: Request, view, dataset: Dataset):
+        if dataset.public and request.method in SAFE_METHODS:
+            return True
+
+        user: User = request.user
+        write_access_allowed = user.is_authenticated and (
+            user == dataset.owner or user.has_perm('collaborator', dataset)
+        )
+        if not write_access_allowed:
+            # No need to worry about leaking that this dataset exists,
+            # since the queryset filter will catch that before it gets here
+            raise exceptions.PermissionDenied()
+
+        # Nothing wrong, permission allowed
+        return True
+
+
+class DatasetViewSet(ModelViewSet):
+    queryset = Dataset.objects.select_related('owner').all()
+
+    permission_classes = [DatasetPermissions]
     serializer_class = DatasetSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['name']
+
+    def get_queryset(self):
+        queryset = self.queryset
+        user = self.request.user
+        real_user = user.is_authenticated
+
+        # Filter public and owner
+        model_filter = Q(public=True)
+        if real_user:
+            model_filter |= Q(owner=user)
+
+        # Filter collaborator
+        queryset = queryset.filter(model_filter)
+        if real_user:
+            queryset |= get_objects_for_user(user, 'collaborator', Dataset, with_superuser=False)
+
+        return queryset.distinct()
 
     # TODO: Optimize this endpoint
     @action(detail=True, methods=['get'])
