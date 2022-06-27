@@ -79,6 +79,19 @@ def test_dataset_add_collaborator_not_owner(api_client, user, user_factory, data
 
 
 @pytest.mark.django_db
+def test_dataset_add_collaborator_is_owner(api_client, user, dataset_factory):
+    api_client.force_authenticate(user)
+
+    dataset: Dataset = dataset_factory(name='test', owner=user)
+    r = api_client.put(
+        f'/api/v1/datasets/{dataset.pk}/collaborators',
+        [{'username': user.username}],
+    )
+    assert r.status_code == 400
+    assert r.json() == [f"Cannot assign dataset owner '{user.username}' as collaborator."]
+
+
+@pytest.mark.django_db
 def test_dataset_add_collaborator_invalid_user(api_client, user, user_factory, dataset_factory):
     api_client.force_authenticate(user)
     dataset: Dataset = dataset_factory(name='test', owner=user)
@@ -94,7 +107,7 @@ def test_dataset_add_collaborator_invalid_user(api_client, user, user_factory, d
         [{'username': 'notarealuser'}],
     )
     assert r.status_code == 400
-    assert r.json() == [{'username': ['User with username notarealuser not found.']}]
+    assert r.json() == {'username': 'User with username notarealuser not found.'}
 
 
 @pytest.mark.django_db
@@ -113,4 +126,4 @@ def test_dataset_get_collaborators(api_client, user, user_factory, dataset_facto
         [{'username': 'notarealuser'}],
     )
     assert r.status_code == 400
-    assert r.json() == [{'username': ['User with username notarealuser not found.']}]
+    assert r.json() == {'username': 'User with username notarealuser not found.'}

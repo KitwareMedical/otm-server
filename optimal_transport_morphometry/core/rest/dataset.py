@@ -1,3 +1,5 @@
+from typing import List
+
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
@@ -15,7 +17,7 @@ from optimal_transport_morphometry.core.rest.image import ImageSerializer
 from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImageSerializer
 from optimal_transport_morphometry.core.rest.registered_image import RegisteredImageSerializer
 from optimal_transport_morphometry.core.rest.segmented_image import SegmentedImageSerializer
-from optimal_transport_morphometry.core.rest.user import ExistingUserSerializer, UserSerializer
+from optimal_transport_morphometry.core.rest.user import UserSerializer
 
 
 class DatasetSerializer(serializers.ModelSerializer):
@@ -77,6 +79,18 @@ class CreateBatchSerializer(serializers.Serializer):
     csvfile = serializers.FileField(allow_empty_file=False, max_length=1024 * 1024)
 
 
+class DatasetCollaboratorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+        ]
+
+    # Redeclare username to remove error for exsting users
+    username = serializers.CharField()
+
+
 class DatasetViewSet(ModelViewSet):
     queryset = Dataset.objects.all()
 
@@ -118,7 +132,7 @@ class DatasetViewSet(ModelViewSet):
 
     @swagger_auto_schema(
         operation_description='Set the collaborators of a dataset.',
-        request_body=ExistingUserSerializer(many=True),
+        request_body=DatasetCollaboratorSerializer(many=True),
     )
     @action(detail=True, methods=['PUT'])
     def collaborators(self, request, pk: str):
@@ -131,12 +145,31 @@ class DatasetViewSet(ModelViewSet):
             raise serializers.ValidationError('Only dataset owner can set collaborators.')
 
         # Validate input, raising errors if necessary
-        serializer: ExistingUserSerializer = ExistingUserSerializer(data=request.data, many=True)
+        serializer: DatasetCollaboratorSerializer = DatasetCollaboratorSerializer(
+            data=request.data, many=True
+        )
         serializer.is_valid(raise_exception=True)
 
-        # Assign perm to each user
+        # Validate users
+        users: List[User] = []
         for userdict in serializer.validated_data:
-            user: User = User.objects.get(username=userdict['username'])
+            username = userdict.get('username')
+            user = User.objects.filter(username=username).first()
+            if user is None:
+                raise serializers.ValidationError(
+                    {'username': f'User with username {username} not found.'}
+                )
+
+            # Check that user is not dataset owner
+            if user == dataset.owner:
+                raise serializers.ValidationError(
+                    f"Cannot assign dataset owner '{user.username}' as collaborator."
+                )
+
+            users.append(user)
+
+        # Assign perm to each user
+        for user in users:
             assign_perm('collaborator', user, dataset)
 
         return Response(None, status=status.HTTP_204_NO_CONTENT)
