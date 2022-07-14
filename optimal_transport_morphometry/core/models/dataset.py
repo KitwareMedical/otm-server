@@ -14,5 +14,5 @@ class Dataset(TimeStampedModel, models.Model):
     class Meta:
         permissions = (('collaborator', 'Collaborator'),)
         constraints = [
-            models.UniqueConstraint(fields=["name", "owner"], name="unique_owner_dataset_name")
+            models.UniqueConstraint(fields=['name', 'owner'], name='unique_owner_dataset_name')
         ]
