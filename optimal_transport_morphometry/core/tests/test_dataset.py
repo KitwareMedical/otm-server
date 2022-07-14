@@ -32,6 +32,31 @@ def test_dataset_create_unauthenticated(api_client):
 
 
 @pytest.mark.django_db
+def test_dataset_create_existing(user, api_client):
+    # Create dataset with name
+    Dataset.objects.create(name='test', owner=user)
+
+    # Attempt to create dataset with the same name
+    api_client.force_authenticate(user)
+    r = api_client.post('/api/v1/datasets', {'name': 'test', 'description': 'asd'})
+    assert r.status_code == 400
+
+
+@pytest.mark.django_db
+def test_dataset_create_existing_no_owner_conflict(user_factory, api_client):
+    user1: User = user_factory()
+    user2: User = user_factory()
+
+    # Create dataset with name
+    Dataset.objects.create(name='test', owner=user1)
+
+    # Attempt to create dataset with the same name
+    api_client.force_authenticate(user2)
+    r = api_client.post('/api/v1/datasets', {'name': 'test', 'description': 'asd'})
+    assert r.status_code == 201
+
+
+@pytest.mark.django_db
 def test_dataset_list(api_client, user, user_factory, dataset_factory):
     dataset: Dataset = dataset_factory(owner=user)
     user2: User = user_factory()

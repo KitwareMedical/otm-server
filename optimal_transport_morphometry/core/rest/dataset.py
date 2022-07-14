@@ -35,6 +35,9 @@ class DatasetSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'preprocessing_complete', 'analysis_complete']
 
+    # Set default value
+    public = serializers.BooleanField(default=False)
+
 
 class ImageGroupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -167,8 +170,22 @@ class DatasetViewSet(ModelViewSet):
         serializer: DatasetSerializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # Dataset data
+        name = serializer.validated_data['name']
+        description = serializer.validated_data['description']
+        public = serializer.validated_data['public']
+
+        # Check that dataset doesn't already exist
+        if Dataset.objects.filter(name=name, owner=request.user).exists():
+            raise serializers.ValidationError(f'Dataset with name "{name}" already exists')
+
         # Perform create
-        ds = Dataset.objects.create(**serializer.validated_data, owner=request.user)
+        ds = Dataset.objects.create(
+            name=name,
+            description=description,
+            public=public,
+            owner=request.user,
+        )
         return Response(DatasetSerializer(ds).data, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(
