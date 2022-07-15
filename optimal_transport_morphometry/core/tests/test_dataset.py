@@ -78,6 +78,71 @@ def test_dataset_list(api_client, user, user_factory, dataset_factory):
 
 
 @pytest.mark.django_db
+def test_dataset_list_filter(api_client, user, user_factory, dataset_factory):
+    # Dataset that's not public, owned by user or shared to user
+    dataset_factory(owner=user_factory())
+
+    # Dataset that's public, but not owned or shared
+    public_dataset: Dataset = dataset_factory(public=True, owner=user_factory())
+
+    # Dataset that's not public, but is owned by user
+    owned_dataset: Dataset = dataset_factory(owner=user)
+
+    # Dataset that's not public, but is shared to user
+    shared_dataset: Dataset = dataset_factory(owner=user_factory())
+    assign_perm('collaborator', user, shared_dataset)
+
+    # Check all
+    api_client.force_authenticate(user)
+
+    # Check private dataset
+    resp = api_client.get('/api/v1/datasets', {'public': False, 'owner': False, 'shared': False})
+    assert resp.json()['count'] == 0
+
+    # Check public dataset
+    resp = api_client.get('/api/v1/datasets', {'public': True, 'owner': False, 'shared': False})
+    assert resp.json()['results'][0]['id'] == public_dataset.id
+
+    # Check owned dataset
+    resp = api_client.get('/api/v1/datasets', {'public': False, 'owner': True, 'shared': False})
+    assert resp.json()['results'][0]['id'] == owned_dataset.id
+
+    # Check shared dataset
+    resp = api_client.get('/api/v1/datasets', {'public': False, 'owner': False, 'shared': True})
+    assert resp.json()['results'][0]['id'] == shared_dataset.id
+
+    # Check that expected get returned
+    resp = api_client.get('/api/v1/datasets', {'public': True, 'owner': True, 'shared': True})
+    dataset_ids = {ds['id'] for ds in resp.json()['results']}
+    assert resp.json()['count'] == 3
+    assert public_dataset.id in dataset_ids
+    assert owned_dataset.id in dataset_ids
+    assert shared_dataset.id in dataset_ids
+
+
+@pytest.mark.django_db
+def test_dataset_list_filter_name(api_client, user, user_factory, dataset_factory):
+    ds_one: Dataset = dataset_factory(name="dataset one", owner=user)
+    ds_two: Dataset = dataset_factory(name="dataset two", owner=user)
+
+    api_client.force_authenticate(user)
+
+    # Base listing
+    resp = api_client.get('/api/v1/datasets')
+    assert resp.json()['count'] == 2
+
+    # Filter for one
+    resp = api_client.get('/api/v1/datasets', {'name': 'one'})
+    assert resp.json()['count'] == 1
+    assert resp.json()['results'][0]['id'] == ds_one.id
+
+    # Filter for two
+    resp = api_client.get('/api/v1/datasets', {'name': 'two'})
+    assert resp.json()['count'] == 1
+    assert resp.json()['results'][0]['id'] == ds_two.id
+
+
+@pytest.mark.django_db
 def test_dataset_list_public(api_client, user, user_factory, dataset_factory):
     dataset_factory()
     dataset_factory(public=True)

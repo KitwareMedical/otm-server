@@ -13,4 +13,4 @@ class DatasetAdmin(GuardedModelAdmin):
 
     search_fields = ['name']
 
-    fields = ['name', 'description', 'owner']
+    fields = ['name', 'description', 'owner', 'public']

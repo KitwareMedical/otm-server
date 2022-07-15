@@ -3,11 +3,11 @@ from typing import List
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from django_filters import rest_framework as filters
 from drf_yasg.utils import swagger_auto_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms
 from rest_framework import exceptions, serializers, status
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -37,6 +37,14 @@ class DatasetSerializer(serializers.ModelSerializer):
 
     # Set default value
     public = serializers.BooleanField(default=False)
+
+
+class DatasetListSerializer(serializers.Serializer):
+    # Add fields for filtering
+    name = serializers.CharField(required=False)
+    public = serializers.BooleanField(required=False, default=True)
+    owner = serializers.BooleanField(required=False, default=True)
+    shared = serializers.BooleanField(required=False, default=True)
 
 
 class ImageGroupSerializer(serializers.ModelSerializer):
@@ -123,26 +131,49 @@ class DatasetViewSet(ModelViewSet):
 
     permission_classes = [DatasetPermissions]
     serializer_class = DatasetSerializer
+    pagination_class = LimitOffsetPagination
 
-    filter_backends = [filters.DjangoFilterBackend]
-    filterset_fields = ['name']
+    @swagger_auto_schema(
+        operation_description='Create a new dataset.',
+        query_serializer=DatasetListSerializer(),
+        responses={200: DatasetSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        # Serialize data
+        serializer = DatasetListSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
 
-    def get_queryset(self):
-        queryset = self.queryset
-        user = self.request.user
+        # Build query
+        model_filter = Q()
+        user = request.user
         real_user = user.is_authenticated
 
+        # Filter public
+        if serializer.validated_data['public']:
+            model_filter |= Q(public=True)
+
         # Filter public and owner
-        model_filter = Q(public=True)
-        if real_user:
+        if serializer.validated_data['owner'] and real_user:
             model_filter |= Q(owner=user)
 
+        # Apply base filters
+        queryset = self.queryset.none()
+        if model_filter:
+            queryset |= self.queryset.filter(model_filter)
+
         # Filter collaborator
-        queryset = queryset.filter(model_filter)
-        if real_user:
+        if serializer.validated_data['shared'] and real_user:
             queryset |= get_objects_for_user(user, 'collaborator', Dataset, with_superuser=False)
 
-        return queryset.distinct()
+        # Filter name
+        queryset = queryset.distinct()
+        if 'name' in serializer.validated_data:
+            queryset = queryset.filter(name__icontains=serializer.validated_data['name'])
+
+        # Build response
+        return self.get_paginated_response(
+            DatasetSerializer(self.paginate_queryset(queryset), many=True).data
+        )
 
     # TODO: Optimize this endpoint
     @action(detail=True, methods=['get'])
