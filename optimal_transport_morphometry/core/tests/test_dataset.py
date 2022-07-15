@@ -122,8 +122,8 @@ def test_dataset_list_filter(api_client, user, user_factory, dataset_factory):
 
 @pytest.mark.django_db
 def test_dataset_list_filter_name(api_client, user, user_factory, dataset_factory):
-    ds_one: Dataset = dataset_factory(name="dataset one", owner=user)
-    ds_two: Dataset = dataset_factory(name="dataset two", owner=user)
+    ds_one: Dataset = dataset_factory(name='dataset one', owner=user)
+    ds_two: Dataset = dataset_factory(name='dataset two', owner=user)
 
     api_client.force_authenticate(user)
 
