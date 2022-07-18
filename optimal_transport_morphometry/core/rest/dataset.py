@@ -7,6 +7,7 @@ from drf_yasg.utils import swagger_auto_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms
 from rest_framework import exceptions, serializers, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 from rest_framework.request import Request
@@ -132,11 +133,11 @@ class DatasetPermissions(BasePermission):
             return True
 
         user: User = request.user
-        write_access_allowed = user.is_authenticated and (
-            user == dataset.owner or user.has_perm('collaborator', dataset)
-        )
-        if not write_access_allowed:
-            raise exceptions.PermissionDenied()
+        if not user.is_authenticated:
+            raise NotAuthenticated()
+
+        if not dataset.has_write_access(user):
+            raise PermissionDenied()
 
         # Nothing wrong, permission allowed
         return True
@@ -158,7 +159,7 @@ class DatasetViewSet(ModelViewSet):
         user: User = request.user
 
         # Add field to denote write access
-        dataset.write_access = user == dataset.owner or user.has_perm('collaborator', dataset)
+        dataset.write_access = dataset.has_write_access(user)
 
         return Response(DatasetDetailSerializer(dataset).data)
 
@@ -254,13 +255,10 @@ class DatasetViewSet(ModelViewSet):
     )
     @action(detail=True, methods=['PUT'])
     def collaborators(self, request, pk: str):
-        if not request.user.is_authenticated:
-            raise serializers.ValidationError('Must be logged in.')
-
         # Retrieve dataset, ensuring user is owner
-        dataset: Dataset = get_object_or_404(Dataset.objects.select_related('owner'), id=pk)
+        dataset: Dataset = self.get_object()
         if request.user != dataset.owner:
-            raise serializers.ValidationError('Only dataset owner can set collaborators.')
+            raise PermissionDenied()
 
         # Validate input, raising errors if necessary
         serializer: DatasetCollaboratorSerializer = DatasetCollaboratorSerializer(
@@ -299,8 +297,11 @@ class DatasetViewSet(ModelViewSet):
             raise serializers.ValidationError('Must be logged in.')
 
         # Retrieve collaborators
+        user: User = request.user
         dataset: Dataset = self.get_object()
-        users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
+        if not dataset.has_write_access(user):
+            raise PermissionDenied('Must be owner or collaborator to view collaborators')
 
         # Return user list
+        users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
         return Response(UserSerializer(instance=users, many=True).data, status=status.HTTP_200_OK)

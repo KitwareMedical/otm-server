@@ -226,11 +226,11 @@ def test_dataset_add_collaborator_unauthenticated(api_client, user, user_factory
         f'/api/v1/datasets/{dataset.pk}/collaborators',
         [{'username': user2.username}],
     )
-    assert r.status_code == 400
+    assert r.status_code == 401
 
 
 @pytest.mark.django_db
-def test_dataset_add_collaborator_not_owner(api_client, user, user_factory, dataset_factory):
+def test_dataset_add_collaborator_no_perms(api_client, user, user_factory, dataset_factory):
     user2: User = user_factory()
     api_client.force_authenticate(user2)
 
@@ -239,8 +239,21 @@ def test_dataset_add_collaborator_not_owner(api_client, user, user_factory, data
         f'/api/v1/datasets/{dataset.pk}/collaborators',
         [{'username': user2.username}],
     )
-    assert r.status_code == 400
-    assert r.json() == ['Only dataset owner can set collaborators.']
+    assert r.status_code == 403
+
+
+@pytest.mark.django_db
+def test_dataset_add_collaborator_not_owner(api_client, user, user_factory, dataset_factory):
+    user2: User = user_factory()
+    dataset: Dataset = dataset_factory(name='test', owner=user)
+    assign_perm('collaborator', user2, dataset)
+
+    api_client.force_authenticate(user2)
+    r = api_client.put(
+        f'/api/v1/datasets/{dataset.pk}/collaborators',
+        [{'username': user2.username}],
+    )
+    assert r.status_code == 403
 
 
 @pytest.mark.django_db
@@ -298,6 +311,12 @@ def test_dataset_get_collaborators(api_client, user_factory, dataset_factory):
     assert r.json() == [{'id': user2.id, 'username': user2.username}]
 
     # Assert user who isn't either can't view collaborators
+    api_client.force_authenticate(user3)
+    r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
+    assert r.status_code == 403
+
+    # Assert the same holds true for public datasets
+    dataset: Dataset = dataset_factory(name='test2', owner=user1, public=True)
     api_client.force_authenticate(user3)
     r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
     assert r.status_code == 403

@@ -16,3 +16,6 @@ class Dataset(TimeStampedModel, models.Model):
         constraints = [
             models.UniqueConstraint(fields=['name', 'owner'], name='unique_owner_dataset_name')
         ]
+
+    def has_write_access(self, user: User):
+        return user == self.owner or user.has_perm('collaborator', self)
