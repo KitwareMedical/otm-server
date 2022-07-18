@@ -233,19 +233,28 @@ def test_dataset_add_collaborator_invalid_user(api_client, user, user_factory, d
 
 
 @pytest.mark.django_db
-def test_dataset_get_collaborators(api_client, user, user_factory, dataset_factory):
-    api_client.force_authenticate(user)
-    dataset: Dataset = dataset_factory(name='test', owner=user)
+def test_dataset_get_collaborators(api_client, user_factory, dataset_factory):
+    user1: User = user_factory()
+    user2: User = user_factory()
+    user3: User = user_factory()
 
-    # Assert missing username is caught
-    r = api_client.put(f'/api/v1/datasets/{dataset.pk}/collaborators', [{}])
-    assert r.status_code == 400
-    assert r.json() == [{'username': ['This field is required.']}]
+    # Create dataset with user1 as owner and user2 as collaborator
+    dataset: Dataset = dataset_factory(name='test', owner=user1)
+    assign_perm('collaborator', user2, dataset)
 
-    # Assert non-existant username is caught
-    r = api_client.put(
-        f'/api/v1/datasets/{dataset.pk}/collaborators',
-        [{'username': 'notarealuser'}],
-    )
+    # Assert owner can view collaborators
+    api_client.force_authenticate(user1)
+    r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
+    assert r.status_code == 200
+    assert r.json() == [{'id': user2.id, 'username': user2.username}]
+
+    # Assert collaborator can view collaborators
+    api_client.force_authenticate(user2)
+    r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
+    assert r.status_code == 200
+    assert r.json() == [{'id': user2.id, 'username': user2.username}]
+
+    # Assert user who isn't either can't view collaborators
+    api_client.force_authenticate(user3)
+    r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
     assert r.status_code == 400
-    assert r.json() == {'username': 'User with username notarealuser not found.'}

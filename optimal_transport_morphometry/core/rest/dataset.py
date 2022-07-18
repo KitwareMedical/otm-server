@@ -274,7 +274,7 @@ class DatasetViewSet(ModelViewSet):
 
         # Raise error if not owner or collaborator
         user: User = request.user
-        if not (dataset.owner == request.user or user.has_perm('collaborator', dataset)):
+        if not (user == dataset.owner or user.has_perm('collaborator', dataset)):
             raise serializers.ValidationError('Must be owner or collaborator to view collaborators')
 
         # Retrieve collaborators
