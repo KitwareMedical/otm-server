@@ -57,6 +57,49 @@ def test_dataset_create_existing_no_owner_conflict(user_factory, api_client):
 
 
 @pytest.mark.django_db
+def test_dataset_retrieve(api_client, user_factory, dataset_factory):
+    user1: User = user_factory()
+    user2: User = user_factory()
+    user3: User = user_factory()
+
+    # Create a public dataset with user1 as owner and user2 as collaborator
+    dataset: Dataset = dataset_factory(owner=user1, public=True)
+    assign_perm('collaborator', user2, dataset)
+
+    # Assert user1 can access and `write_access` is True
+    api_client.force_authenticate(user1)
+    r = api_client.get(f'/api/v1/datasets/{dataset.id}')
+    assert r.status_code == 200
+    assert r.json()['write_access'] is True
+
+    # Assert user2 can access and `write_access` is True
+    api_client.force_authenticate(user2)
+    r = api_client.get(f'/api/v1/datasets/{dataset.id}')
+    assert r.status_code == 200
+    assert r.json()['write_access'] is True
+
+    # Assert user3 can access and `write_access` is False
+    api_client.force_authenticate(user3)
+    r = api_client.get(f'/api/v1/datasets/{dataset.id}')
+    assert r.status_code == 200
+    assert r.json()['write_access'] is False
+
+
+@pytest.mark.django_db
+def test_dataset_retrieve_private(api_client, user_factory, dataset_factory):
+    user1: User = user_factory()
+    user2: User = user_factory()
+
+    # Create a public dataset with user1 as owner and user2 as collaborator
+    dataset: Dataset = dataset_factory(owner=user1)
+
+    # Assert user2 can't access dataset
+    api_client.force_authenticate(user2)
+    r = api_client.get(f'/api/v1/datasets/{dataset.id}')
+    assert r.status_code == 403
+
+
+@pytest.mark.django_db
 def test_dataset_list(api_client, user, user_factory, dataset_factory):
     dataset: Dataset = dataset_factory(owner=user)
     user2: User = user_factory()
@@ -257,4 +300,4 @@ def test_dataset_get_collaborators(api_client, user_factory, dataset_factory):
     # Assert user who isn't either can't view collaborators
     api_client.force_authenticate(user3)
     r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
-    assert r.status_code == 400
+    assert r.status_code == 403

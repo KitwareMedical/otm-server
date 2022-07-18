@@ -39,7 +39,25 @@ class DatasetSerializer(serializers.ModelSerializer):
     public = serializers.BooleanField(default=False)
 
 
-class DatasetListSerializer(serializers.Serializer):
+class DatasetDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Dataset
+        fields = [
+            'id',
+            'name',
+            'description',
+            'public',
+            'preprocessing_complete',
+            'analysis_complete',
+            'write_access',
+        ]
+        read_only_fields = fields
+
+    # Add extra fields
+    write_access = serializers.BooleanField(required=False, read_only=True)
+
+
+class DatasetListQuerySerializer(serializers.Serializer):
     # Add fields for filtering
     name = serializers.CharField(required=False)
     public = serializers.BooleanField(required=False, default=True)
@@ -118,8 +136,6 @@ class DatasetPermissions(BasePermission):
             user == dataset.owner or user.has_perm('collaborator', dataset)
         )
         if not write_access_allowed:
-            # No need to worry about leaking that this dataset exists,
-            # since the queryset filter will catch that before it gets here
             raise exceptions.PermissionDenied()
 
         # Nothing wrong, permission allowed
@@ -134,13 +150,26 @@ class DatasetViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
     @swagger_auto_schema(
+        operation_description='Retrieve a dataset by its ID.',
+        responses={200: DatasetDetailSerializer()},
+    )
+    def retrieve(self, request, pk):
+        dataset: Dataset = self.get_object()
+        user: User = request.user
+
+        # Add field to denote write access
+        dataset.write_access = user == dataset.owner or user.has_perm('collaborator', dataset)
+
+        return Response(DatasetDetailSerializer(dataset).data)
+
+    @swagger_auto_schema(
         operation_description='Create a new dataset.',
-        query_serializer=DatasetListSerializer(),
+        query_serializer=DatasetListQuerySerializer(),
         responses={200: DatasetSerializer(many=True)},
     )
     def list(self, request, *args, **kwargs):
         # Serialize data
-        serializer = DatasetListSerializer(data=request.query_params)
+        serializer = DatasetListQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         # Build query
@@ -269,15 +298,8 @@ class DatasetViewSet(ModelViewSet):
         if not request.user.is_authenticated:
             raise serializers.ValidationError('Must be logged in.')
 
-        # Retrieve dataset and validate input, raising errors if necessary
-        dataset: Dataset = get_object_or_404(Dataset.objects.select_related('owner'), id=pk)
-
-        # Raise error if not owner or collaborator
-        user: User = request.user
-        if not (user == dataset.owner or user.has_perm('collaborator', dataset)):
-            raise serializers.ValidationError('Must be owner or collaborator to view collaborators')
-
         # Retrieve collaborators
+        dataset: Dataset = self.get_object()
         users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
 
         # Return user list
