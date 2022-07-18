@@ -201,22 +201,20 @@ def test_dataset_add_collaborator(api_client, user, user_factory, dataset_factor
 
     dataset: Dataset = dataset_factory(name='test', owner=user)
     user2: User = user_factory()
-    r = api_client.put(
-        f'/api/v1/datasets/{dataset.pk}/collaborators',
-        [{'username': user2.username}],
-    )
-    assert r.status_code == 204
-    assert user2.has_perm('collaborator', dataset)
-
-    r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
-    assert r.status_code == 200
-    assert r.json() == [
+    collaborators = [
         {
             'id': user2.pk,
             'username': user2.username,
             'name': user2.get_full_name(),
         }
     ]
+    r = api_client.put(
+        f'/api/v1/datasets/{dataset.pk}/collaborators',
+        [{'username': user2.username}],
+    )
+    assert r.status_code == 200
+    assert r.json() == collaborators
+    assert user2.has_perm('collaborator', dataset)
 
 
 @pytest.mark.django_db

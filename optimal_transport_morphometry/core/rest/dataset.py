@@ -287,7 +287,11 @@ class DatasetViewSet(ModelViewSet):
         for user in users:
             assign_perm('collaborator', user, dataset)
 
-        return Response(None, status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            UserSerializer(
+                get_users_with_perms(dataset, only_with_perms_in=['collaborator']), many=True
+            ).data
+        )
 
     @swagger_auto_schema(operation_description='Get the collaborators of a dataset.')
     @collaborators.mapping.get
