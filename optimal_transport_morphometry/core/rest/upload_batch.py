@@ -3,6 +3,7 @@ import codecs
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import parsers, serializers
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -41,7 +42,15 @@ class UploadBatchViewSet(ModelViewSet):
     def create(self, request):
         serializer = CreateBatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        dataset = get_object_or_404(Dataset, pk=serializer.validated_data['dataset'])
+        dataset: Dataset = get_object_or_404(
+            Dataset.objects.select_related('owner'),
+            pk=serializer.validated_data['dataset'],
+        )
+
+        # Check perms
+        if not dataset.has_write_access(request.user):
+            raise PermissionDenied()
+
         csvfile = codecs.iterdecode(serializer.validated_data['csvfile'], 'utf-8')
         batch = load_batch_from_csv(csvfile, dest=dataset)
         serializer = UploadBatchSerializer(batch)

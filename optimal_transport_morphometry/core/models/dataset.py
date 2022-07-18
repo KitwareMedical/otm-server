@@ -18,4 +18,4 @@ class Dataset(TimeStampedModel, models.Model):
         ]
 
     def has_write_access(self, user: User):
-        return user == self.owner or user.has_perm('collaborator', self)
+        return user.is_authenticated and (user == self.owner or user.has_perm('collaborator', self))

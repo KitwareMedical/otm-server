@@ -2,10 +2,9 @@ from typing import List
 
 from django.contrib.auth.models import User
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
 from drf_yasg.utils import swagger_auto_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms
-from rest_framework import exceptions, serializers, status
+from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
