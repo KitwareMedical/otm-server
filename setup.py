@@ -45,6 +45,7 @@ setup(
         'django-configurations[database,email]',
         'django-extensions',
         'django-filter',
+        'django-guardian',
         'django-oauth-toolkit',
         'djangorestframework',
         'drf-yasg',

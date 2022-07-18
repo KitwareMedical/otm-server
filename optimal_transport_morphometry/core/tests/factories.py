@@ -20,6 +20,7 @@ class DatasetFactory(factory.django.DjangoModelFactory):
 
     name = factory.Faker('word')
     description = factory.Faker('paragraph')
+    owner = factory.SubFactory(UserFactory)
 
 
 class ImageFactory(factory.django.DjangoModelFactory):

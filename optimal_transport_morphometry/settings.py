@@ -29,9 +29,14 @@ class OptimalTransportMorphometryMixin(ConfigMixin):
 
         # Install additional apps
         configuration.INSTALLED_APPS += [
+            'guardian',
             's3_file_field',
         ]
 
+        # Add additional auth backends
+        configuration.AUTHENTICATION_BACKENDS += ['guardian.backends.ObjectPermissionBackend']
+
+        #
         configuration.REST_FRAMEWORK.update(
             {
                 'DEFAULT_PAGINATION_CLASS': f'{_pkg}.core.pagination.BoundedLimitOffsetPagination',
