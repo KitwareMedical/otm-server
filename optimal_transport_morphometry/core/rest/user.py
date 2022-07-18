@@ -9,10 +9,12 @@ from rest_framework.viewsets import GenericViewSet
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = [
-            'id',
-            'username',
-        ]
+        fields = ['id', 'username', 'name']
+
+    name = serializers.SerializerMethodField()
+
+    def get_name(self, obj: User):
+        return obj.get_full_name()
 
 
 class UserViewSet(GenericViewSet):

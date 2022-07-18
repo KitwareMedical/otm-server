@@ -214,6 +214,7 @@ def test_dataset_add_collaborator(api_client, user, user_factory, dataset_factor
         {
             'id': user2.pk,
             'username': user2.username,
+            'name': user2.get_full_name(),
         }
     ]
 
@@ -298,17 +299,25 @@ def test_dataset_get_collaborators(api_client, user_factory, dataset_factory):
     dataset: Dataset = dataset_factory(name='test', owner=user1)
     assign_perm('collaborator', user2, dataset)
 
+    collaborators = [
+        {
+            'id': user2.id,
+            'username': user2.username,
+            'name': user2.get_full_name(),
+        }
+    ]
+
     # Assert owner can view collaborators
     api_client.force_authenticate(user1)
     r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
     assert r.status_code == 200
-    assert r.json() == [{'id': user2.id, 'username': user2.username}]
+    assert r.json() == collaborators
 
     # Assert collaborator can view collaborators
     api_client.force_authenticate(user2)
     r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
     assert r.status_code == 200
-    assert r.json() == [{'id': user2.id, 'username': user2.username}]
+    assert r.json() == collaborators
 
     # Assert user who isn't either can't view collaborators
     api_client.force_authenticate(user3)
