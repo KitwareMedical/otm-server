@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from guardian.shortcuts import assign_perm
+from guardian.shortcuts import assign_perm, get_users_with_perms
 import pytest
 
 from optimal_transport_morphometry.core.models.dataset import Dataset
@@ -217,6 +217,65 @@ def test_dataset_add_collaborator(api_client, user, user_factory, dataset_factor
     assert user2.has_perm('collaborator', dataset)
 
 
+@pytest.mark.django_db(transaction=True)
+def test_dataset_remove_collaborator(api_client, user, user_factory, dataset_factory):
+    dataset: Dataset = dataset_factory(name='test', owner=user)
+    assign_perm('collaborator', user, dataset)
+
+    # Remove perm
+    api_client.force_authenticate(user)
+    r = api_client.put(
+        f'/api/v1/datasets/{dataset.pk}/collaborators',
+        [],
+    )
+
+    # Assert user no longer has perm
+    assert r.status_code == 200
+    assert r.json() == []
+    assert not user.has_perm('collaborator', dataset)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dataset_add_remove_collaborator(api_client, user, user_factory, dataset_factory):
+    dataset: Dataset = dataset_factory(name='test', owner=user)
+
+    user1: User = user_factory()
+    user2: User = user_factory()
+    user3: User = user_factory()
+    user4: User = user_factory()
+    assign_perm('collaborator', user1, dataset)
+    assign_perm('collaborator', user2, dataset)
+    assign_perm('collaborator', user3, dataset)
+
+    # Remove user1, add user4
+    api_client.force_authenticate(user)
+    r = api_client.put(
+        f'/api/v1/datasets/{dataset.pk}/collaborators',
+        [
+            {'username': user2.username},
+            {'username': user3.username},
+            {'username': user4.username},
+        ],
+    )
+
+    collaborators = [
+        {
+            'id': u.pk,
+            'username': u.username,
+            'name': u.get_full_name(),
+        }
+        for u in [user2, user3, user4]
+    ]
+
+    # Assert correct list
+    assert r.status_code == 200
+    assert r.json() == collaborators
+    assert not user1.has_perm('collaborator', dataset)
+    assert user2.has_perm('collaborator', dataset)
+    assert user3.has_perm('collaborator', dataset)
+    assert user4.has_perm('collaborator', dataset)
+
+
 @pytest.mark.django_db
 def test_dataset_add_collaborator_unauthenticated(api_client, user, user_factory, dataset_factory):
     dataset: Dataset = dataset_factory(name='test', owner=user)
@@ -284,7 +343,23 @@ def test_dataset_add_collaborator_invalid_user(api_client, user, user_factory, d
         [{'username': 'notarealuser'}],
     )
     assert r.status_code == 400
-    assert r.json() == {'username': 'User with username notarealuser not found.'}
+    assert r.json() == [{'username': 'User with username notarealuser not found.'}]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dataset_add_collaborator_integrity(api_client, user, user_factory, dataset_factory):
+    user1: User = user_factory()
+    dataset: Dataset = dataset_factory(name='test', owner=user)
+    assign_perm('collaborator', user1, dataset)
+
+    # Intentionally fail request
+    api_client.force_authenticate(user)
+    r = api_client.put(f'/api/v1/datasets/{dataset.pk}/collaborators', [{'username': 'asdasd'}])
+    assert r.status_code == 400
+
+    # Assert user1 still is collaborator, any nobody else does
+    assert user1.has_perm('collaborator', dataset)
+    assert list(get_users_with_perms(dataset, only_with_perms_in=['collaborator'])) == [user1]
 
 
 @pytest.mark.django_db

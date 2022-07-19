@@ -1,9 +1,10 @@
 from typing import List
 
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Q
 from drf_yasg.utils import swagger_auto_schema
-from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms
+from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms, remove_perm
 from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotAuthenticated, PermissionDenied
@@ -265,28 +266,37 @@ class DatasetViewSet(ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
 
-        # Validate users
-        users: List[User] = []
-        for userdict in serializer.validated_data:
-            username = userdict.get('username')
-            user = User.objects.filter(username=username).first()
-            if user is None:
-                raise serializers.ValidationError(
+        # Check that dataset owner not added
+        usernames = [userdict['username'] for userdict in serializer.validated_data]
+        if dataset.owner.username in usernames:
+            raise serializers.ValidationError(
+                f"Cannot assign dataset owner '{dataset.owner.username}' as collaborator."
+            )
+
+        # Retrieve users, check if any not found
+        users: List[User] = list(User.objects.filter(username__in=usernames))
+        if len(users) != len(usernames):
+            found = {user.username for user in users}
+            not_found = [uname for uname in usernames if uname not in found]
+            raise serializers.ValidationError(
+                [
                     {'username': f'User with username {username} not found.'}
-                )
+                    for username in not_found
+                ]
+            )
 
-            # Check that user is not dataset owner
-            if user == dataset.owner:
-                raise serializers.ValidationError(
-                    f"Cannot assign dataset owner '{user.username}' as collaborator."
-                )
+        # All users valid, add/remove as needed
+        with transaction.atomic():
+            # Remove existing users
+            # TODO: Optimize this if possible
+            for user in get_users_with_perms(dataset, only_with_perms_in=['collaborator']):
+                remove_perm('collaborator', user, dataset)
 
-            users.append(user)
+            # Assign new users
+            if users:
+                assign_perm('collaborator', users, dataset)
 
-        # Assign perm to each user
-        for user in users:
-            assign_perm('collaborator', user, dataset)
-
+        # Return response
         return Response(
             UserSerializer(
                 get_users_with_perms(dataset, only_with_perms_in=['collaborator']), many=True
