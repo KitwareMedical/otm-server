@@ -22,7 +22,7 @@ from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImage
 from optimal_transport_morphometry.core.rest.registered_image import RegisteredImageSerializer
 from optimal_transport_morphometry.core.rest.segmented_image import SegmentedImageSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
-from optimal_transport_morphometry.core.tasks import preprocess_images
+from optimal_transport_morphometry.core.tasks import preprocess_images, run_utm
 
 
 class DatasetSerializer(serializers.ModelSerializer):
@@ -358,4 +358,23 @@ class DatasetViewSet(ModelViewSet):
 
         # Dispatch task, return task id
         task: AsyncResult = preprocess_images.delay(dataset.id)
+        return Response(PreprocessResponseSerializer({'task_id': task.id}).data)
+
+    @swagger_auto_schema(
+        operation_description='Run analysis on a dataset.',
+        request_body=no_body,
+        responses={200: PreprocessResponseSerializer()},
+    )
+    @action(detail=True, methods=['POST'])
+    def utm_analysis(self, request, pk: str):
+        dataset: Dataset = self.get_object()
+        if dataset.analysis_status == Dataset.ProcessStatus.RUNNING:
+            raise serializers.ValidationError('Analysis currently running.')
+
+        # Set status of preprocessing here, to avoid race conditions
+        dataset.analysis_status = Dataset.ProcessStatus.RUNNING
+        dataset.save(update_fields=['analysis_status'])
+
+        # Dispatch task, return task id
+        task: AsyncResult = run_utm.delay(dataset.id)
         return Response(PreprocessResponseSerializer({'task_id': task.id}).data)
