@@ -283,7 +283,7 @@ class DatasetViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         # Check that dataset owner not added
-        usernames = [userdict['username'] for userdict in serializer.validated_data]
+        usernames = {userdict['username'] for userdict in serializer.validated_data}
         if dataset.owner.username in usernames:
             raise serializers.ValidationError(
                 f"Cannot assign dataset owner '{dataset.owner.username}' as collaborator."

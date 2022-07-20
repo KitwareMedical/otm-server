@@ -365,6 +365,21 @@ def test_dataset_add_collaborator_integrity(api_client, user, user_factory, data
     assert list(get_users_with_perms(dataset, only_with_perms_in=['collaborator'])) == [user1]
 
 
+@pytest.mark.django_db(transaction=True)
+def test_dataset_add_collaborator_malformed(api_client, user, user_factory, dataset_factory):
+    user1: User = user_factory()
+    dataset: Dataset = dataset_factory(name='test', owner=user)
+    assign_perm('collaborator', user1, dataset)
+
+    # Intentionally specify the same user twice
+    api_client.force_authenticate(user)
+    r = api_client.put(
+        f'/api/v1/datasets/{dataset.pk}/collaborators',
+        [{'username': user1.username}, {'username': user1.username}],
+    )
+    assert r.status_code == 200
+
+
 @pytest.mark.django_db
 def test_dataset_get_collaborators(api_client, user_factory, dataset_factory):
     user1: User = user_factory()
