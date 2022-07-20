@@ -28,6 +28,7 @@ from optimal_transport_morphometry.core.rest.image import ImageSerializer
 from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImageSerializer
 from optimal_transport_morphometry.core.rest.registered_image import RegisteredImageSerializer
 from optimal_transport_morphometry.core.rest.segmented_image import SegmentedImageSerializer
+from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
 from optimal_transport_morphometry.core.tasks import preprocess_images, run_utm
 
@@ -306,36 +307,32 @@ class DatasetViewSet(ModelViewSet):
         users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
         return Response(UserSerializer(instance=users, many=True).data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        operation_description='Retrieve the preprocessed images, as annotated onto each image'
+        ' entry for this dataset.',
+        query_serializer=LimitOffsetSerializer,
+    )
     @action(detail=True, methods=['get'])
     def preprocessed_images(self, request, pk):
         dataset: Dataset = self.get_object()
         dataset_images: List[Image] = self.paginate_queryset(Image.objects.filter(dataset=dataset))
-        registered_images = RegisteredImage.objects.filter(
-            source_image__in=dataset_images
-        ).distinct('source_image')
-        jacobian_images = JacobianImage.objects.filter(source_image__in=dataset_images).distinct(
-            'source_image'
-        )
-        segmented_images = SegmentedImage.objects.filter(source_image__in=dataset_images).distinct(
-            'source_image'
-        )
-        feature_images = FeatureImage.objects.filter(source_image__in=dataset_images).distinct(
-            'source_image'
-        )
 
-        # Annotate image with each value
+        # Create map and start assigning processed images to each
+        # We do this so we can make ~4 queries, as opposed to O(n) queries
         image_map = {im.id: im for im in dataset_images}
-        for image in registered_images:
-            image_map[image.source_image_id].registered = image
-        for image in jacobian_images:
-            image_map[image.source_image_id].jacobian = image
-        for image in segmented_images:
-            image_map[image.source_image_id].segmented = image
-        for image in feature_images:
-            image_map[image.source_image_id].feature = image
+        image_classes = [
+            (RegisteredImage, 'registered'),
+            (JacobianImage, 'jacobian'),
+            (SegmentedImage, 'segmented'),
+            (FeatureImage, 'feature'),
+        ]
+        for klass, key in image_classes:
+            qs = klass.objects.filter(source_image__in=dataset_images).distinct('source_image')
+            for image in qs.iterator():
+                setattr(image_map[image.source_image_id], key, image)
 
         serializer = ImageGroupSerializer(image_map.values(), many=True)
-        return Response(serializer.data)
+        return self.get_paginated_response(serializer.data)
 
     @swagger_auto_schema(
         operation_description='Start preprocessing on a dataset.',
