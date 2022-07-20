@@ -15,12 +15,20 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from optimal_transport_morphometry.core.models import Dataset, Image
+from optimal_transport_morphometry.core.models import (
+    Dataset,
+    FeatureImage,
+    Image,
+    JacobianImage,
+    RegisteredImage,
+    SegmentedImage,
+)
 from optimal_transport_morphometry.core.rest.feature_image import FeatureImageSerializer
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
 from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImageSerializer
 from optimal_transport_morphometry.core.rest.registered_image import RegisteredImageSerializer
 from optimal_transport_morphometry.core.rest.segmented_image import SegmentedImageSerializer
+from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
 from optimal_transport_morphometry.core.tasks import preprocess_images, run_utm
 
@@ -77,38 +85,10 @@ class ImageGroupSerializer(serializers.ModelSerializer):
         fields = ImageSerializer.Meta.fields + new_fields
         read_only_fields = ImageSerializer.Meta.fields + new_fields
 
-    registered = serializers.SerializerMethodField()
-    jacobian = serializers.SerializerMethodField()
-    segmented = serializers.SerializerMethodField()
-    feature = serializers.SerializerMethodField()
-
-    def get_registered(self, obj: Image):
-        im = obj.registered_images.first()
-        if im is None:
-            return None
-
-        return RegisteredImageSerializer(im).data
-
-    def get_jacobian(self, obj: Image):
-        im = obj.jacobian_images.first()
-        if im is None:
-            return None
-
-        return JacobianImageSerializer(im).data
-
-    def get_segmented(self, obj: Image):
-        im = obj.segmented_images.first()
-        if im is None:
-            return None
-
-        return SegmentedImageSerializer(im).data
-
-    def get_feature(self, obj: Image):
-        im = obj.feature_images.first()
-        if im is None:
-            return None
-
-        return FeatureImageSerializer(im).data
+    registered = RegisteredImageSerializer(allow_null=True)
+    jacobian = JacobianImageSerializer(allow_null=True)
+    segmented = SegmentedImageSerializer(allow_null=True)
+    feature = FeatureImageSerializer(allow_null=True)
 
 
 class CreateBatchSerializer(serializers.Serializer):
@@ -222,20 +202,6 @@ class DatasetViewSet(ModelViewSet):
             DatasetSerializer(self.paginate_queryset(queryset), many=True).data
         )
 
-    # TODO: Optimize this endpoint
-    @action(detail=True, methods=['get'])
-    def preprocessed_images(self, request, pk):
-        dataset: Dataset = self.get_object()
-        images = dataset.images.prefetch_related(
-            'registered_images',
-            'jacobian_images',
-            'segmented_images',
-            'feature_images',
-        ).all()
-
-        serializer = ImageGroupSerializer(images, many=True)
-        return Response(serializer.data)
-
     @swagger_auto_schema(
         operation_description='Create a new dataset.',
         request_body=DatasetSerializer(),
@@ -340,6 +306,33 @@ class DatasetViewSet(ModelViewSet):
         # Return user list
         users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
         return Response(UserSerializer(instance=users, many=True).data, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(
+        operation_description='Retrieve the preprocessed images, as annotated onto each image'
+        ' entry for this dataset.',
+        query_serializer=LimitOffsetSerializer,
+    )
+    @action(detail=True, methods=['get'])
+    def preprocessed_images(self, request, pk):
+        dataset: Dataset = self.get_object()
+        dataset_images: List[Image] = self.paginate_queryset(Image.objects.filter(dataset=dataset))
+
+        # Create map and start assigning processed images to each
+        # We do this so we can make ~4 queries, as opposed to O(n) queries
+        image_map = {im.id: im for im in dataset_images}
+        image_classes = [
+            (RegisteredImage, 'registered'),
+            (JacobianImage, 'jacobian'),
+            (SegmentedImage, 'segmented'),
+            (FeatureImage, 'feature'),
+        ]
+        for klass, key in image_classes:
+            qs = klass.objects.filter(source_image__in=dataset_images).distinct('source_image')
+            for image in qs.iterator():
+                setattr(image_map[image.source_image_id], key, image)
+
+        serializer = ImageGroupSerializer(image_map.values(), many=True)
+        return self.get_paginated_response(serializer.data)
 
     @swagger_auto_schema(
         operation_description='Start preprocessing on a dataset.',
