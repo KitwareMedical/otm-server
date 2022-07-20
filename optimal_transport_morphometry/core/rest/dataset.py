@@ -1,9 +1,10 @@
 from typing import List
 
+from celery.result import AsyncResult
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Q
-from drf_yasg.utils import swagger_auto_schema
+from drf_yasg.utils import no_body, swagger_auto_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms, remove_perm
 from rest_framework import serializers, status
 from rest_framework.decorators import action
@@ -21,6 +22,7 @@ from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImage
 from optimal_transport_morphometry.core.rest.registered_image import RegisteredImageSerializer
 from optimal_transport_morphometry.core.rest.segmented_image import SegmentedImageSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
+from optimal_transport_morphometry.core.tasks import preprocess_images
 
 
 class DatasetSerializer(serializers.ModelSerializer):
@@ -111,6 +113,10 @@ class ImageGroupSerializer(serializers.ModelSerializer):
 
 class CreateBatchSerializer(serializers.Serializer):
     csvfile = serializers.FileField(allow_empty_file=False, max_length=1024 * 1024)
+
+
+class PreprocessResponseSerializer(serializers.Serializer):
+    task_id = serializers.CharField()
 
 
 class DatasetCollaboratorSerializer(serializers.ModelSerializer):
@@ -334,3 +340,22 @@ class DatasetViewSet(ModelViewSet):
         # Return user list
         users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
         return Response(UserSerializer(instance=users, many=True).data, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(
+        operation_description='Start preprocessing on a dataset.',
+        request_body=no_body,
+        responses={200: PreprocessResponseSerializer()},
+    )
+    @action(detail=True, methods=['POST'])
+    def preprocess(self, request, pk: str):
+        dataset: Dataset = self.get_object()
+        if dataset.preprocessing_status == Dataset.ProcessStatus.RUNNING:
+            raise serializers.ValidationError('Preprocessing currently running.')
+
+        # Set status of preprocessing here, to avoid race conditions
+        dataset.preprocessing_status = Dataset.ProcessStatus.RUNNING
+        dataset.save(update_fields=['preprocessing_status'])
+
+        # Dispatch task, return task id
+        task: AsyncResult = preprocess_images.delay(dataset.id)
+        return Response(PreprocessResponseSerializer({'task_id': task.id}).data)

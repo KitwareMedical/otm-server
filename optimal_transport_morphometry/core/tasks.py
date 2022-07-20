@@ -13,27 +13,25 @@ from optimal_transport_morphometry.core import models
 
 
 @shared_task()
-def preprocess_images(
-    atlas_id: int,
-    atlas_csf_id: int,
-    atlas_grey_id: int,
-    atlas_white_id: int,
-    dataset_id: int,
-    replace: bool = False,
-    downsample: float = 3.0,
-):
+def preprocess_images(dataset_id: int, replace: bool = False, downsample: float = 3.0):
     # Import to avoid need for ants package in API
     import ants
     import numpy as np
 
-    atlas = models.Atlas.objects.get(pk=atlas_id)
-    atlas_csf = models.Atlas.objects.get(pk=atlas_csf_id)
-    atlas_grey = models.Atlas.objects.get(pk=atlas_grey_id)
-    atlas_white = models.Atlas.objects.get(pk=atlas_white_id)
+    atlas = models.Atlas.objects.filter(name='T1.nii').first()
+    atlas_csf = models.Atlas.objects.filter(name='csf.nii').first()
+    atlas_grey = models.Atlas.objects.filter(name='grey.nii').first()
+    atlas_white = models.Atlas.objects.filter(name='white.nii').first()
     dataset: models.Dataset = models.Dataset.objects.get(pk=dataset_id)
 
-    dataset.preprocessing_status = models.Dataset.ProcessStatus.RUNNING
-    dataset.save(update_fields=['preprocessing_status'])
+    # Check that all atlases found
+    if None in [atlas, atlas_csf, atlas_grey, atlas_white]:
+        raise Exception('Not all atlases found')
+
+    # Ensure in running state
+    if dataset.preprocessing_status != models.Dataset.ProcessStatus.RUNNING:
+        dataset.preprocessing_status = models.Dataset.ProcessStatus.RUNNING
+        dataset.save(update_fields=['preprocessing_status'])
 
     print('Downloading atlas files')
     with NamedTemporaryFile(suffix='atlas.nii') as tmp, atlas.blob.open() as blob:
