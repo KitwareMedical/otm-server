@@ -15,7 +15,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from optimal_transport_morphometry.core.models import Dataset, Image
+from optimal_transport_morphometry.core.models import (
+    Dataset,
+    FeatureImage,
+    Image,
+    JacobianImage,
+    RegisteredImage,
+    SegmentedImage,
+)
 from optimal_transport_morphometry.core.rest.feature_image import FeatureImageSerializer
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
 from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImageSerializer
@@ -77,38 +84,10 @@ class ImageGroupSerializer(serializers.ModelSerializer):
         fields = ImageSerializer.Meta.fields + new_fields
         read_only_fields = ImageSerializer.Meta.fields + new_fields
 
-    registered = serializers.SerializerMethodField()
-    jacobian = serializers.SerializerMethodField()
-    segmented = serializers.SerializerMethodField()
-    feature = serializers.SerializerMethodField()
-
-    def get_registered(self, obj: Image):
-        im = obj.registered_images.first()
-        if im is None:
-            return None
-
-        return RegisteredImageSerializer(im).data
-
-    def get_jacobian(self, obj: Image):
-        im = obj.jacobian_images.first()
-        if im is None:
-            return None
-
-        return JacobianImageSerializer(im).data
-
-    def get_segmented(self, obj: Image):
-        im = obj.segmented_images.first()
-        if im is None:
-            return None
-
-        return SegmentedImageSerializer(im).data
-
-    def get_feature(self, obj: Image):
-        im = obj.feature_images.first()
-        if im is None:
-            return None
-
-        return FeatureImageSerializer(im).data
+    registered = RegisteredImageSerializer(allow_null=True)
+    jacobian = JacobianImageSerializer(allow_null=True)
+    segmented = SegmentedImageSerializer(allow_null=True)
+    feature = FeatureImageSerializer(allow_null=True)
 
 
 class CreateBatchSerializer(serializers.Serializer):
@@ -222,20 +201,6 @@ class DatasetViewSet(ModelViewSet):
             DatasetSerializer(self.paginate_queryset(queryset), many=True).data
         )
 
-    # TODO: Optimize this endpoint
-    @action(detail=True, methods=['get'])
-    def preprocessed_images(self, request, pk):
-        dataset: Dataset = self.get_object()
-        images = dataset.images.prefetch_related(
-            'registered_images',
-            'jacobian_images',
-            'segmented_images',
-            'feature_images',
-        ).all()
-
-        serializer = ImageGroupSerializer(images, many=True)
-        return Response(serializer.data)
-
     @swagger_auto_schema(
         operation_description='Create a new dataset.',
         request_body=DatasetSerializer(),
@@ -340,6 +305,37 @@ class DatasetViewSet(ModelViewSet):
         # Return user list
         users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
         return Response(UserSerializer(instance=users, many=True).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def preprocessed_images(self, request, pk):
+        dataset: Dataset = self.get_object()
+        dataset_images: List[Image] = self.paginate_queryset(Image.objects.filter(dataset=dataset))
+        registered_images = RegisteredImage.objects.filter(
+            source_image__in=dataset_images
+        ).distinct('source_image')
+        jacobian_images = JacobianImage.objects.filter(source_image__in=dataset_images).distinct(
+            'source_image'
+        )
+        segmented_images = SegmentedImage.objects.filter(source_image__in=dataset_images).distinct(
+            'source_image'
+        )
+        feature_images = FeatureImage.objects.filter(source_image__in=dataset_images).distinct(
+            'source_image'
+        )
+
+        # Annotate image with each value
+        image_map = {im.id: im for im in dataset_images}
+        for image in registered_images:
+            image_map[image.source_image_id].registered = image
+        for image in jacobian_images:
+            image_map[image.source_image_id].jacobian = image
+        for image in segmented_images:
+            image_map[image.source_image_id].segmented = image
+        for image in feature_images:
+            image_map[image.source_image_id].feature = image
+
+        serializer = ImageGroupSerializer(image_map.values(), many=True)
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         operation_description='Start preprocessing on a dataset.',
