@@ -66,23 +66,23 @@ def test_dataset_retrieve(api_client, user_factory, dataset_factory):
     dataset: Dataset = dataset_factory(owner=user1, public=True)
     assign_perm('collaborator', user2, dataset)
 
-    # Assert user1 can access and `write_access` is True
+    # Assert user1 access
     api_client.force_authenticate(user1)
     r = api_client.get(f'/api/v1/datasets/{dataset.id}')
     assert r.status_code == 200
-    assert r.json()['write_access'] is True
+    assert r.json()['access'] == 'owner'
 
-    # Assert user2 can access and `write_access` is True
+    # Assert user2 access
     api_client.force_authenticate(user2)
     r = api_client.get(f'/api/v1/datasets/{dataset.id}')
     assert r.status_code == 200
-    assert r.json()['write_access'] is True
+    assert r.json()['access'] == 'collaborator'
 
-    # Assert user3 can access and `write_access` is False
+    # Assert user3 access
     api_client.force_authenticate(user3)
     r = api_client.get(f'/api/v1/datasets/{dataset.id}')
     assert r.status_code == 200
-    assert r.json()['write_access'] is False
+    assert r.json()['access'] is None
 
 
 @pytest.mark.django_db

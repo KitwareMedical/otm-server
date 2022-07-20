@@ -50,12 +50,16 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
             'public',
             'preprocessing_complete',
             'analysis_complete',
-            'write_access',
+            'access',
         ]
         read_only_fields = fields
 
     # Add extra fields
-    write_access = serializers.BooleanField(required=False, read_only=True)
+    access = serializers.ChoiceField(
+        required=False,
+        read_only=True,
+        choices=['admin', 'write', None],
+    )
 
 
 class DatasetListQuerySerializer(serializers.Serializer):
@@ -134,7 +138,7 @@ class DatasetPermissions(BasePermission):
         if not user.is_authenticated:
             raise NotAuthenticated()
 
-        if not dataset.has_write_access(user):
+        if dataset.access(user) is None:
             raise PermissionDenied()
 
         # Nothing wrong, permission allowed
@@ -171,7 +175,7 @@ class DatasetViewSet(ModelViewSet):
         user: User = request.user
 
         # Add field to denote write access
-        dataset.write_access = dataset.has_write_access(user)
+        dataset.access = dataset.access(user)
 
         return Response(DatasetDetailSerializer(dataset).data)
 
@@ -324,7 +328,7 @@ class DatasetViewSet(ModelViewSet):
         # Retrieve collaborators
         user: User = request.user
         dataset: Dataset = self.get_object()
-        if not dataset.has_write_access(user):
+        if dataset.access(user) is None:
             raise PermissionDenied('Must be owner or collaborator to view collaborators')
 
         # Return user list

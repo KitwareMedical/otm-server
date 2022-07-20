@@ -17,5 +17,15 @@ class Dataset(TimeStampedModel, models.Model):
             models.UniqueConstraint(fields=['name', 'owner'], name='unique_owner_dataset_name')
         ]
 
-    def has_write_access(self, user: User):
-        return user.is_authenticated and (user == self.owner or user.has_perm('collaborator', self))
+    def access(self, user: User):
+        # Must check this before passing to user.has_perm
+        if not user.is_authenticated:
+            return None
+
+        if user == self.owner:
+            return 'owner'
+
+        if user.has_perm('collaborator', self):
+            return 'collaborator'
+
+        return None

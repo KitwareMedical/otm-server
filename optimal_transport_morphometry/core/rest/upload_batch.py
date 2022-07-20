@@ -48,7 +48,7 @@ class UploadBatchViewSet(ModelViewSet):
         )
 
         # Check perms
-        if not dataset.has_write_access(request.user):
+        if dataset.access(request.user) is None:
             raise PermissionDenied()
 
         csvfile = codecs.iterdecode(serializer.validated_data['csvfile'], 'utf-8')
