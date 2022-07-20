@@ -31,10 +31,10 @@ class DatasetSerializer(serializers.ModelSerializer):
             'name',
             'description',
             'public',
-            'preprocessing_complete',
-            'analysis_complete',
+            'preprocessing_status',
+            'analysis_status',
         ]
-        read_only_fields = ['id', 'preprocessing_complete', 'analysis_complete']
+        read_only_fields = ['id', 'preprocessing_status', 'analysis_status']
 
     # Set default value
     public = serializers.BooleanField(default=False)
@@ -48,8 +48,8 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
             'name',
             'description',
             'public',
-            'preprocessing_complete',
-            'analysis_complete',
+            'preprocessing_status',
+            'analysis_status',
             'access',
         ]
         read_only_fields = fields
