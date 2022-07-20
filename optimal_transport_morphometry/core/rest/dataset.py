@@ -61,9 +61,7 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
 class DatasetListQuerySerializer(serializers.Serializer):
     # Add fields for filtering
     name = serializers.CharField(required=False)
-    public = serializers.BooleanField(required=False, default=True)
-    owner = serializers.BooleanField(required=False, default=True)
-    shared = serializers.BooleanField(required=False, default=True)
+    access = serializers.ChoiceField(choices=['public', 'shared', 'owned'], required=False)
 
 
 class ImageGroupSerializer(serializers.ModelSerializer):
@@ -150,6 +148,20 @@ class DatasetViewSet(ModelViewSet):
     serializer_class = DatasetSerializer
     pagination_class = LimitOffsetPagination
 
+    def get_queryset(self):
+        user = self.request.user
+
+        # If anonymous user, only return public datasets
+        if not user.is_authenticated:
+            return self.queryset.filter(public=True)
+
+        # Return only the datasets this user has access to, which is
+        # all public datasets, all shared and owned datasets
+        shared_pks = get_objects_for_user(
+            user, 'collaborator', Dataset, with_superuser=False
+        ).values_list('id', flat=True)
+        return self.queryset.filter(Q(public=True) | Q(owner=user) | Q(pk__in=shared_pks))
+
     @swagger_auto_schema(
         operation_description='Retrieve a dataset by its ID.',
         responses={200: DatasetDetailSerializer()},
@@ -173,32 +185,27 @@ class DatasetViewSet(ModelViewSet):
         serializer = DatasetListQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        # Build query
-        model_filter = Q()
-        user = request.user
-        real_user = user.is_authenticated
+        # Retrieve values
+        user: User = request.user
+        access = serializer.validated_data.get('access')
 
-        # Filter public
-        if serializer.validated_data['public']:
-            model_filter |= Q(public=True)
-
-        # Filter public and owner
-        if serializer.validated_data['owner'] and real_user:
-            model_filter |= Q(owner=user)
-
-        # Apply base filters
-        queryset = self.queryset.none()
-        if model_filter:
-            queryset |= self.queryset.filter(model_filter)
-
-        # Filter collaborator
-        if serializer.validated_data['shared'] and real_user:
-            queryset |= get_objects_for_user(user, 'collaborator', Dataset, with_superuser=False)
+        # Set queryset based on access param
+        if access is None:
+            # Return all accessible values if no access specified
+            queryset = self.get_queryset()
+        elif access == 'public' or not user.is_authenticated:
+            queryset = self.queryset.filter(public=True)
+        elif access == 'shared':
+            queryset = get_objects_for_user(user, 'collaborator', Dataset, with_superuser=False)
+        elif access == 'owned':
+            queryset = Dataset.objects.filter(owner=user)
+        else:
+            raise Exception("Invalid state for serialized value 'access' achieved.")
 
         # Filter name
-        queryset = queryset.distinct()
-        if 'name' in serializer.validated_data:
-            queryset = queryset.filter(name__icontains=serializer.validated_data['name'])
+        name = serializer.validated_data.get('name')
+        if name:
+            queryset = queryset.filter(name__icontains=name)
 
         # Build response
         return self.get_paginated_response(
@@ -256,8 +263,13 @@ class DatasetViewSet(ModelViewSet):
     @action(detail=True, methods=['PUT'])
     def collaborators(self, request, pk: str):
         # Retrieve dataset, ensuring user is owner
+        user: User = request.user
+        if not user.is_authenticated:
+            raise NotAuthenticated()
+
+        # Get dataset
         dataset: Dataset = self.get_object()
-        if request.user != dataset.owner:
+        if user != dataset.owner:
             raise PermissionDenied()
 
         # Validate input, raising errors if necessary

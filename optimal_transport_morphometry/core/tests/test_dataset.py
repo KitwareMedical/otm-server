@@ -96,7 +96,7 @@ def test_dataset_retrieve_private(api_client, user_factory, dataset_factory):
     # Assert user2 can't access dataset
     api_client.force_authenticate(user2)
     r = api_client.get(f'/api/v1/datasets/{dataset.id}')
-    assert r.status_code == 403
+    assert r.status_code == 404
 
 
 @pytest.mark.django_db
@@ -126,7 +126,8 @@ def test_dataset_list_filter(api_client, user, user_factory, dataset_factory):
     dataset_factory(owner=user_factory())
 
     # Dataset that's public, but not owned or shared
-    public_dataset: Dataset = dataset_factory(public=True, owner=user_factory())
+    public_dataset_owner: User = user_factory()
+    public_dataset: Dataset = dataset_factory(public=True, owner=public_dataset_owner)
 
     # Dataset that's not public, but is owned by user
     owned_dataset: Dataset = dataset_factory(owner=user)
@@ -138,24 +139,26 @@ def test_dataset_list_filter(api_client, user, user_factory, dataset_factory):
     # Check all
     api_client.force_authenticate(user)
 
-    # Check private dataset
-    resp = api_client.get('/api/v1/datasets', {'public': False, 'owner': False, 'shared': False})
-    assert resp.json()['count'] == 0
-
     # Check public dataset
-    resp = api_client.get('/api/v1/datasets', {'public': True, 'owner': False, 'shared': False})
+    resp = api_client.get('/api/v1/datasets', {'access': 'public'})
+    assert resp.json()['results'][0]['id'] == public_dataset.id
+
+    # Check that owner=False, public=True combination functions correctly (if owner)
+    api_client.force_authenticate(public_dataset_owner)
+    resp = api_client.get('/api/v1/datasets', {'access': 'public'})
     assert resp.json()['results'][0]['id'] == public_dataset.id
 
     # Check owned dataset
-    resp = api_client.get('/api/v1/datasets', {'public': False, 'owner': True, 'shared': False})
+    api_client.force_authenticate(user)
+    resp = api_client.get('/api/v1/datasets', {'access': 'owned'})
     assert resp.json()['results'][0]['id'] == owned_dataset.id
 
     # Check shared dataset
-    resp = api_client.get('/api/v1/datasets', {'public': False, 'owner': False, 'shared': True})
+    resp = api_client.get('/api/v1/datasets', {'access': 'shared'})
     assert resp.json()['results'][0]['id'] == shared_dataset.id
 
     # Check that expected get returned
-    resp = api_client.get('/api/v1/datasets', {'public': True, 'owner': True, 'shared': True})
+    resp = api_client.get('/api/v1/datasets')
     dataset_ids = {ds['id'] for ds in resp.json()['results']}
     assert resp.json()['count'] == 3
     assert public_dataset.id in dataset_ids
@@ -297,7 +300,7 @@ def test_dataset_add_collaborator_no_perms(api_client, user, user_factory, datas
         f'/api/v1/datasets/{dataset.pk}/collaborators',
         [{'username': user2.username}],
     )
-    assert r.status_code == 403
+    assert r.status_code == 404
 
 
 @pytest.mark.django_db
@@ -395,7 +398,7 @@ def test_dataset_get_collaborators(api_client, user_factory, dataset_factory):
     # Assert user who isn't either can't view collaborators
     api_client.force_authenticate(user3)
     r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
-    assert r.status_code == 403
+    assert r.status_code == 404
 
     # Assert the same holds true for public datasets
     dataset: Dataset = dataset_factory(name='test2', owner=user1, public=True)
