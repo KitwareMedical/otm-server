@@ -371,3 +371,15 @@ class DatasetViewSet(ModelViewSet):
         # Dispatch task, return task id
         task: AsyncResult = run_utm.delay(dataset.id)
         return Response(PreprocessResponseSerializer({'task_id': task.id}).data)
+
+    @swagger_auto_schema(
+        operation_description='Retrieve all dataset images.',
+        query_serializer=LimitOffsetSerializer,
+    )
+    @action(detail=True, methods=['GET'])
+    def images(self, request, pk: str):
+        dataset: Dataset = self.get_object()
+        images = Image.objects.filter(dataset=dataset)
+        return self.get_paginated_response(
+            ImageSerializer(self.paginate_queryset(images), many=True).data
+        )

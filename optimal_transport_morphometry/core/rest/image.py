@@ -1,14 +1,16 @@
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import serializers
+from rest_framework import mixins, serializers
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, SAFE_METHODS, BasePermission
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied
+from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import GenericViewSet
 
 from optimal_transport_morphometry.core.models import Dataset, Image, PendingUpload
 
@@ -28,7 +30,34 @@ class CreateImageSerializer(serializers.ModelSerializer):
     pending_upload = serializers.IntegerField()
 
 
-class ImageViewSet(ModelViewSet):
+# TODO: UPDATE
+class ImagePermissions(BasePermission):
+    def has_permission(self, request: Request, view):
+        # Any user can list or create datasets
+        return True
+
+    def has_object_permission(self, request: Request, view, dataset: Dataset):
+        if dataset.public and request.method in SAFE_METHODS:
+            return True
+
+        user: User = request.user
+        if not user.is_authenticated:
+            raise NotAuthenticated()
+
+        if dataset.access(user) is None:
+            raise PermissionDenied()
+
+        # Nothing wrong, permission allowed
+        return True
+
+
+class ImageViewSet(
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    GenericViewSet,
+):
     queryset = Image.objects.all()
 
     permission_classes = [AllowAny]
@@ -36,6 +65,9 @@ class ImageViewSet(ModelViewSet):
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['dataset']
+
+    # def get_queryset(self):
+    #     queryset = Image.objects.filter()
 
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):
