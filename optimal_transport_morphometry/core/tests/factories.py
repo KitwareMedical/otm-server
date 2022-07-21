@@ -7,7 +7,6 @@ from optimal_transport_morphometry.core.models import (
     FeatureImage,
     Image,
     JacobianImage,
-    Patient,
     RegisteredImage,
     SegmentedImage,
 )
@@ -21,13 +20,6 @@ class UserFactory(factory.django.DjangoModelFactory):
     email = factory.Faker('safe_email')
     first_name = factory.Faker('first_name')
     last_name = factory.Faker('last_name')
-
-
-class PatientFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = Patient
-
-    identifier = factory.Faker('uuid4')
 
 
 class T1AtlasFactory(factory.django.DjangoModelFactory):
@@ -54,7 +46,6 @@ class ImageFactory(factory.django.DjangoModelFactory):
     name = factory.Faker('file_name', category='image')
     blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
     dataset = factory.SubFactory(DatasetFactory)
-    patient = factory.SubFactory(PatientFactory)
 
 
 class FeatureImageFactory(factory.django.DjangoModelFactory):

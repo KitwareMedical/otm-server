@@ -5,18 +5,19 @@ from django_filters import rest_framework as filters
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, SAFE_METHODS, BasePermission
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from optimal_transport_morphometry.core.models import Image, PendingUpload
+from optimal_transport_morphometry.core.models import Dataset, Image, PendingUpload
 
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
-        fields = ['id', 'name', 'type', 'dataset', 'patient', 'metadata']
-        read_only_fields = ['type', 'dataset', 'patient', 'metadata']
+        fields = ['id', 'name', 'type', 'dataset', 'metadata']
+        read_only_fields = ['type', 'dataset', 'metadata']
 
 
 class CreateImageSerializer(serializers.ModelSerializer):
@@ -56,7 +57,6 @@ class ImageViewSet(ModelViewSet):
         # TODO validate existence of key in storage
         image = Image.objects.create(
             blob=blob,
-            patient=upload.patient,
             name=upload.name,
             metadata=upload.metadata,
             dataset=upload.batch.dataset,

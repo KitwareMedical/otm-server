@@ -10,7 +10,7 @@ from optimal_transport_morphometry.core.models import PendingUpload, UploadBatch
 class PendingUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model = PendingUpload
-        fields = ['id', 'patient', 'name']
+        fields = ['id', 'name']
 
 
 class PendingUploadListRequestSerializer(serializers.Serializer):

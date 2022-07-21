@@ -57,7 +57,6 @@ def command(csv: TextIO, email: str, dataset_name: str, clear: bool, include_ima
                     Image(
                         name=upload.name,
                         dataset=batch.dataset,
-                        patient=upload.patient,
                         metadata=upload.metadata,
                         blob=SimpleUploadedFile(name=upload.name, content=file_contents.read()),
                     )
