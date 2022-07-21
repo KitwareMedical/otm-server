@@ -7,7 +7,7 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import mixins, serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotAuthenticated, PermissionDenied
-from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -30,13 +30,14 @@ class CreateImageSerializer(serializers.ModelSerializer):
     pending_upload = serializers.IntegerField()
 
 
-# TODO: UPDATE
 class ImagePermissions(BasePermission):
     def has_permission(self, request: Request, view):
-        # Any user can list or create datasets
+        # Only endpoint that this hits is create
+        # Create logic is handled in that method
         return True
 
-    def has_object_permission(self, request: Request, view, dataset: Dataset):
+    def has_object_permission(self, request: Request, view, image: Image):
+        dataset: Dataset = image.dataset
         if dataset.public and request.method in SAFE_METHODS:
             return True
 
@@ -58,20 +59,22 @@ class ImageViewSet(
     mixins.DestroyModelMixin,
     GenericViewSet,
 ):
-    queryset = Image.objects.all()
+    queryset = Image.objects.select_related('dataset').all()
 
-    permission_classes = [AllowAny]
+    permission_classes = [ImagePermissions]
     serializer_class = ImageSerializer
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['dataset']
 
-    # def get_queryset(self):
-    #     queryset = Image.objects.filter()
+    def get_queryset(self):
+        # Get all allowed images
+        datasets = Dataset.visible_datasets(self.request.user)
+        return self.queryset.filter(dataset__in=datasets)
 
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):
-        image = get_object_or_404(Image, pk=pk)
+        image = self.get_object()
         return HttpResponseRedirect(image.blob.url)
 
     @transaction.atomic
@@ -83,8 +86,18 @@ class ImageViewSet(
     def create(self, request):
         serializer = CreateImageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        upload = get_object_or_404(PendingUpload, pk=serializer.validated_data['pending_upload'])
         blob = serializer.validated_data['blob']
+
+        # Fetch upload
+        upload: PendingUpload = get_object_or_404(
+            PendingUpload.objects.select_related('batch__dataset'),
+            pk=serializer.validated_data['pending_upload'],
+        )
+
+        # Ensure access
+        dataset: Dataset = upload.batch.dataset
+        if dataset.access(request.user) is None:
+            raise PermissionDenied()
 
         # TODO validate existence of key in storage
         image = Image.objects.create(

@@ -3,7 +3,6 @@ from typing import List
 from celery.result import AsyncResult
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q
 from drf_yasg.utils import no_body, swagger_auto_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms, remove_perm
 from rest_framework import serializers, status
@@ -139,18 +138,7 @@ class DatasetViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
-        user = self.request.user
-
-        # If anonymous user, only return public datasets
-        if not user.is_authenticated:
-            return self.queryset.filter(public=True)
-
-        # Return only the datasets this user has access to, which is
-        # all public datasets, all shared and owned datasets
-        shared_pks = get_objects_for_user(
-            user, 'collaborator', Dataset, with_superuser=False
-        ).values_list('id', flat=True)
-        return self.queryset.filter(Q(public=True) | Q(owner=user) | Q(pk__in=shared_pks))
+        return Dataset.visible_datasets(self.request.user)
 
     @swagger_auto_schema(
         operation_description='Retrieve a dataset by its ID.',
