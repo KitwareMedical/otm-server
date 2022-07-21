@@ -149,7 +149,6 @@ def run_utm(dataset_id: int):
         variables = []
         for image in dataset.images.all():
             meta = image.metadata
-            meta['name'] = f'{meta.pop("ID")}.nii'  # rename ID to name and add extension
             variables.append(meta)
 
             feature_image = image.feature_images.first()
