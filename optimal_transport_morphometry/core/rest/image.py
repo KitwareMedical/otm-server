@@ -55,8 +55,6 @@ class ImagePermissions(BasePermission):
 class ImageViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin,
     GenericViewSet,
 ):
     queryset = Image.objects.select_related('dataset').all()
@@ -80,8 +78,8 @@ class ImageViewSet(
     @transaction.atomic
     @swagger_auto_schema(
         operation_description='Create a new image.',
-        request_body=CreateImageSerializer,
-        responses={200: ImageSerializer},
+        request_body=CreateImageSerializer(),
+        responses={200: ImageSerializer()},
     )
     def create(self, request):
         serializer = CreateImageSerializer(data=request.data)

@@ -7,8 +7,10 @@ from optimal_transport_morphometry.core.models import (
     FeatureImage,
     Image,
     JacobianImage,
+    PendingUpload,
     RegisteredImage,
     SegmentedImage,
+    UploadBatch,
 )
 
 
@@ -37,6 +39,21 @@ class DatasetFactory(factory.django.DjangoModelFactory):
     name = factory.Faker('word')
     description = factory.Faker('paragraph')
     owner = factory.SubFactory(UserFactory)
+
+
+class UploadBatchFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = UploadBatch
+
+    dataset = factory.SubFactory(DatasetFactory)
+
+
+class PendingUploadFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PendingUpload
+
+    name = factory.Faker('file_name', category='image')
+    batch = factory.SubFactory(UploadBatchFactory)
 
 
 class ImageFactory(factory.django.DjangoModelFactory):
