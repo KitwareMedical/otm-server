@@ -8,16 +8,20 @@ from rest_framework import permissions, routers
 from optimal_transport_morphometry.core import rest
 
 router = routers.SimpleRouter(trailing_slash=False)
+router.register(r'users', rest.UserViewSet)
 router.register(r'atlases', rest.AtlasViewSet)
 router.register(r'datasets', rest.DatasetViewSet)
-router.register(r'feature_images', rest.FeatureImageViewSet)
 router.register(r'images', rest.ImageViewSet)
-router.register(r'jacobian_images', rest.JacobianImageViewSet)
-router.register(r'pending_uploads', rest.PendingUploadViewSet)
-router.register(r'registered_images', rest.RegisteredImageViewSet)
-router.register(r'segmented_images', rest.SegmentedImageViewSet)
-router.register(r'upload_batches', rest.UploadBatchViewSet)
-router.register(r'users', rest.UserViewSet)
+
+# Preprocessed images
+router.register(r'preprocessed/feature_images', rest.FeatureImageViewSet)
+router.register(r'preprocessed/jacobian_images', rest.JacobianImageViewSet)
+router.register(r'preprocessed/registered_images', rest.RegisteredImageViewSet)
+router.register(r'preprocessed/segmented_images', rest.SegmentedImageViewSet)
+
+# Upload
+router.register(r'upload/pending_uploads', rest.PendingUploadViewSet)
+router.register(r'upload/upload_batches', rest.UploadBatchViewSet)
 
 # OpenAPI generation
 schema_view = get_schema_view(
