@@ -22,11 +22,13 @@ from optimal_transport_morphometry.core.models import (
     RegisteredImage,
     SegmentedImage,
 )
-from optimal_transport_morphometry.core.rest.feature_image import FeatureImageSerializer
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
-from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImageSerializer
-from optimal_transport_morphometry.core.rest.registered_image import RegisteredImageSerializer
-from optimal_transport_morphometry.core.rest.segmented_image import SegmentedImageSerializer
+from optimal_transport_morphometry.core.rest.preprocessing import (
+    FeatureImageSerializer,
+    JacobianImageSerializer,
+    RegisteredImageSerializer,
+    SegmentedImageSerializer,
+)
 from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
 from optimal_transport_morphometry.core.tasks import preprocess_images, run_utm

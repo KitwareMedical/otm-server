@@ -14,10 +14,10 @@ router.register(r'datasets', rest.DatasetViewSet)
 router.register(r'images', rest.ImageViewSet)
 
 # Preprocessed images
-router.register(r'preprocessed/feature_images', rest.FeatureImageViewSet)
-router.register(r'preprocessed/jacobian_images', rest.JacobianImageViewSet)
-router.register(r'preprocessed/registered_images', rest.RegisteredImageViewSet)
-router.register(r'preprocessed/segmented_images', rest.SegmentedImageViewSet)
+# router.register(r'preprocessed/feature_images', rest.FeatureImageViewSet)
+# router.register(r'preprocessed/jacobian_images', rest.JacobianImageViewSet)
+# router.register(r'preprocessed/registered_images', rest.RegisteredImageViewSet)
+# router.register(r'preprocessed/segmented_images', rest.SegmentedImageViewSet)
 
 # Upload
 router.register(r'upload/pending_uploads', rest.PendingUploadViewSet)
