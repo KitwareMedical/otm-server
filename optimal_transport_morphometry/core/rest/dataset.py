@@ -1,3 +1,4 @@
+import codecs
 from typing import List
 
 from celery.result import AsyncResult
@@ -13,6 +14,7 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
 
 from optimal_transport_morphometry.core.models import (
     Dataset,
@@ -22,6 +24,7 @@ from optimal_transport_morphometry.core.models import (
     RegisteredImage,
     SegmentedImage,
 )
+from optimal_transport_morphometry.core.models.upload_batch import UploadBatch
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
 from optimal_transport_morphometry.core.rest.preprocessing import (
     FeatureImageSerializer,
@@ -30,6 +33,7 @@ from optimal_transport_morphometry.core.rest.preprocessing import (
     SegmentedImageSerializer,
 )
 from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
+from optimal_transport_morphometry.core.rest.upload_batch import UploadBatchSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
 from optimal_transport_morphometry.core.tasks import preprocess_images, run_utm
 
@@ -364,7 +368,7 @@ class DatasetViewSet(ModelViewSet):
 
     @swagger_auto_schema(
         operation_description='Retrieve all dataset images.',
-        query_serializer=LimitOffsetSerializer,
+        query_serializer=LimitOffsetSerializer(),
     )
     @action(detail=True, methods=['GET'])
     def images(self, request, pk: str):
@@ -373,3 +377,37 @@ class DatasetViewSet(ModelViewSet):
         return self.get_paginated_response(
             ImageSerializer(self.paginate_queryset(images), many=True).data
         )
+
+    @swagger_auto_schema(
+        operation_description='Create Upload Batch.',
+        request_body=CreateBatchSerializer(),
+    )
+    @action(detail=True, methods=['POST'])
+    def upload_batch(self, request, pk):
+        serializer = CreateBatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dataset: Dataset = self.get_object()
+        csvfile = codecs.iterdecode(serializer.validated_data['csvfile'], 'utf-8')
+        batch = load_batch_from_csv(csvfile, dest=dataset)
+        serializer = UploadBatchSerializer(batch)
+        return Response(serializer.data, status=201)
+
+    @swagger_auto_schema(
+        operation_description="List this dataset's upload batches.",
+        query_serializer=LimitOffsetSerializer(),
+        responses={200: UploadBatchSerializer(many=True)},
+    )
+    @action(detail=True, methods=['GET'])
+    def upload_batches(self, request, pk):
+        dataset: Dataset = self.get_object()
+        queryset = UploadBatch.objects.filter(dataset_id=dataset.id)
+
+        # Paginate and return
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = UploadBatchSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = UploadBatchSerializer(queryset, many=True)
+        return Response(serializer.data)

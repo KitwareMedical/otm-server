@@ -20,8 +20,8 @@ router.register(r'images', rest.ImageViewSet)
 # router.register(r'preprocessed/segmented_images', rest.SegmentedImageViewSet)
 
 # Upload
-router.register(r'upload/pending_uploads', rest.PendingUploadViewSet)
-router.register(r'upload/upload_batches', rest.UploadBatchViewSet)
+router.register(r'upload/pending', rest.PendingUploadViewSet)
+router.register(r'upload/batches', rest.UploadBatchViewSet)
 
 # OpenAPI generation
 schema_view = get_schema_view(
