@@ -14,8 +14,8 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
 
+from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
 from optimal_transport_morphometry.core.models import (
     Dataset,
     FeatureImage,
