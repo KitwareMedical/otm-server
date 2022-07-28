@@ -86,13 +86,18 @@ class ImageViewSet(
         serializer.is_valid(raise_exception=True)
         blob = serializer.validated_data['blob']
 
-        # Fetch upload
+        # Construct queryset of allowed pending uploads
+        queryset = PendingUpload.objects.filter(
+            batch__dataset_id__in=Dataset.visible_datasets(self.request.user)
+        )
+
+        # Fetch upload or 404
         upload: PendingUpload = get_object_or_404(
-            PendingUpload.objects.select_related('batch__dataset'),
+            queryset.select_related('batch__dataset'),
             pk=serializer.validated_data['pending_upload'],
         )
 
-        # Ensure access
+        # If found, ensure user has write access
         dataset: Dataset = upload.batch.dataset
         if dataset.access(request.user) is None:
             raise PermissionDenied()
