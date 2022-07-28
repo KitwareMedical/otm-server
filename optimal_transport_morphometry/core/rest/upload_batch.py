@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from optimal_transport_morphometry.core.models import PendingUpload, UploadBatch
+from optimal_transport_morphometry.core.models import Dataset, PendingUpload, UploadBatch
 from optimal_transport_morphometry.core.rest.pending_upload import PendingUploadSerializer
 from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
 
@@ -31,6 +31,10 @@ class UploadBatchViewSet(RetrieveModelMixin, GenericViewSet):
 
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['dataset']
+
+    def get_queryset(self):
+        datasets = Dataset.visible_datasets(self.request.user)
+        return self.queryset.filter(dataset__in=datasets)
 
     @swagger_auto_schema(
         operation_description='List pending uploads for a batch.',

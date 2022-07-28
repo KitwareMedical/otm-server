@@ -1,5 +1,6 @@
 import pathlib
 from pathlib import Path
+from typing import List
 
 # from django.core.files import File
 # from django.core.files.uploadedfile import SimpleUploadedFile
@@ -34,7 +35,82 @@ def test_upload_batch_finalization_cleanup(batch):
         batch.refresh_from_db()
 
 
-# TODO: Add test for upload batch permissions
+@pytest.mark.django_db
+def test_upload_batch_access(api_client, user, dataset_factory, upload_batch_factory):
+    batch: models.UploadBatch = upload_batch_factory(dataset=dataset_factory(owner=user))
+
+    api_client.force_authenticate(user)
+    r = api_client.get(f'/api/v1/upload/batches/{batch.id}')
+    assert r.status_code == 200
+
+
+@pytest.mark.django_db
+def test_upload_batch_access_unauthorized(
+    api_client, user, user_factory, dataset_factory, upload_batch_factory
+):
+    batch: models.UploadBatch = upload_batch_factory(dataset=dataset_factory(owner=user))
+
+    api_client.force_authenticate(user_factory())
+    r = api_client.get(f'/api/v1/upload/batches/{batch.id}')
+    assert r.status_code == 404
+
+
+@pytest.mark.django_db
+def test_upload_batch_pending_access(
+    api_client, user, dataset_factory, upload_batch_factory, pending_upload_factory
+):
+    dataset: models.Dataset = dataset_factory(owner=user)
+    batch: models.UploadBatch = upload_batch_factory(dataset=dataset)
+    uploads: List[models.PendingUpload] = [pending_upload_factory(batch=batch) for _ in range(10)]
+
+    api_client.force_authenticate(user)
+    r = api_client.get(f'/api/v1/upload/batches/{batch.id}/pending')
+    assert r.status_code == 200
+    assert len(r.json()['results']) == len(uploads)
+
+
+@pytest.mark.django_db
+def test_upload_batch_pending_access_unauthorized(
+    api_client, user, dataset_factory, upload_batch_factory, pending_upload_factory
+):
+    dataset: models.Dataset = dataset_factory()
+    batch: models.UploadBatch = upload_batch_factory(dataset=dataset)
+
+    # Create pending uploads
+    for _ in range(10):
+        pending_upload_factory(batch=batch)
+
+    # Assert no authorization
+    api_client.force_authenticate(user)
+    r = api_client.get(f'/api/v1/upload/batches/{batch.id}/pending')
+    assert r.status_code == 404
+
+
+@pytest.mark.django_db
+def test_pending_upload_access(api_client, user, dataset_factory, pending_upload_factory):
+    dataset: models.Dataset = dataset_factory(owner=user)
+    upload: models.PendingUpload = pending_upload_factory(batch__dataset=dataset)
+
+    # Assert no authorization
+    api_client.force_authenticate(user)
+    r = api_client.get(f'/api/v1/upload/pending/{upload.id}')
+    assert r.status_code == 200
+
+
+@pytest.mark.django_db
+def test_pending_upload_access_unauthorized(
+    api_client, user, dataset_factory, pending_upload_factory
+):
+    dataset: models.Dataset = dataset_factory()
+    upload: models.PendingUpload = pending_upload_factory(batch__dataset=dataset)
+
+    # Assert no authorization
+    api_client.force_authenticate(user)
+    r = api_client.get(f'/api/v1/upload/pending/{upload.id}')
+    assert r.status_code == 404
+
+
+# TODO: Add test for creating upload batch
 # @pytest.mark.django_db
 # def test_rest_create_upload_batch(api_client, user, dataset_factory):
 #     file = SimpleUploadedFile(
