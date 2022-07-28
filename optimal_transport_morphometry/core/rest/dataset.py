@@ -1,9 +1,9 @@
+import codecs
 from typing import List
 
 from celery.result import AsyncResult
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q
 from drf_yasg.utils import no_body, swagger_auto_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms, remove_perm
 from rest_framework import serializers, status
@@ -15,6 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
 from optimal_transport_morphometry.core.models import (
     Dataset,
     FeatureImage,
@@ -23,12 +24,16 @@ from optimal_transport_morphometry.core.models import (
     RegisteredImage,
     SegmentedImage,
 )
-from optimal_transport_morphometry.core.rest.feature_image import FeatureImageSerializer
+from optimal_transport_morphometry.core.models.upload_batch import UploadBatch
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
-from optimal_transport_morphometry.core.rest.jacobian_image import JacobianImageSerializer
-from optimal_transport_morphometry.core.rest.registered_image import RegisteredImageSerializer
-from optimal_transport_morphometry.core.rest.segmented_image import SegmentedImageSerializer
+from optimal_transport_morphometry.core.rest.preprocessing import (
+    FeatureImageSerializer,
+    JacobianImageSerializer,
+    RegisteredImageSerializer,
+    SegmentedImageSerializer,
+)
 from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
+from optimal_transport_morphometry.core.rest.upload_batch import UploadBatchSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
 from optimal_transport_morphometry.core.tasks import preprocess_images, run_utm
 
@@ -139,18 +144,7 @@ class DatasetViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
-        user = self.request.user
-
-        # If anonymous user, only return public datasets
-        if not user.is_authenticated:
-            return self.queryset.filter(public=True)
-
-        # Return only the datasets this user has access to, which is
-        # all public datasets, all shared and owned datasets
-        shared_pks = get_objects_for_user(
-            user, 'collaborator', Dataset, with_superuser=False
-        ).values_list('id', flat=True)
-        return self.queryset.filter(Q(public=True) | Q(owner=user) | Q(pk__in=shared_pks))
+        return Dataset.visible_datasets(self.request.user)
 
     @swagger_auto_schema(
         operation_description='Retrieve a dataset by its ID.',
@@ -371,3 +365,49 @@ class DatasetViewSet(ModelViewSet):
         # Dispatch task, return task id
         task: AsyncResult = run_utm.delay(dataset.id)
         return Response(PreprocessResponseSerializer({'task_id': task.id}).data)
+
+    @swagger_auto_schema(
+        operation_description='Retrieve all dataset images.',
+        query_serializer=LimitOffsetSerializer(),
+    )
+    @action(detail=True, methods=['GET'])
+    def images(self, request, pk: str):
+        dataset: Dataset = self.get_object()
+        images = Image.objects.filter(dataset=dataset)
+        return self.get_paginated_response(
+            ImageSerializer(self.paginate_queryset(images), many=True).data
+        )
+
+    @swagger_auto_schema(
+        operation_description='Create Upload Batch.',
+        request_body=CreateBatchSerializer(),
+    )
+    @action(detail=True, methods=['POST'])
+    def upload_batch(self, request, pk):
+        serializer = CreateBatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dataset: Dataset = self.get_object()
+        csvfile = codecs.iterdecode(serializer.validated_data['csvfile'], 'utf-8')
+        batch = load_batch_from_csv(csvfile, dest=dataset)
+        serializer = UploadBatchSerializer(batch)
+        return Response(serializer.data, status=201)
+
+    @swagger_auto_schema(
+        operation_description="List this dataset's upload batches.",
+        query_serializer=LimitOffsetSerializer(),
+        responses={200: UploadBatchSerializer(many=True)},
+    )
+    @action(detail=True, methods=['GET'])
+    def upload_batches(self, request, pk):
+        dataset: Dataset = self.get_object()
+        queryset = UploadBatch.objects.filter(dataset_id=dataset.id)
+
+        # Paginate and return
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = UploadBatchSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = UploadBatchSerializer(queryset, many=True)
+        return Response(serializer.data)

@@ -1,11 +1,13 @@
 from .atlas import AtlasViewSet
 from .dataset import DatasetViewSet
-from .feature_image import FeatureImageViewSet
 from .image import ImageViewSet
-from .jacobian_image import JacobianImageViewSet
 from .pending_upload import PendingUploadViewSet
-from .registered_image import RegisteredImageViewSet
-from .segmented_image import SegmentedImageViewSet
+from .preprocessing import (
+    FeatureImageViewSet,
+    JacobianImageViewSet,
+    RegisteredImageViewSet,
+    SegmentedImageViewSet,
+)
 from .upload_batch import UploadBatchViewSet
 from .user import UserViewSet
 

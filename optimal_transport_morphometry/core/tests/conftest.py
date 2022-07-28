@@ -7,9 +7,11 @@ from .factories import (
     FeatureImageFactory,
     ImageFactory,
     JacobianImageFactory,
+    PendingUploadFactory,
     RegisteredImageFactory,
     SegmentedImageFactory,
     T1AtlasFactory,
+    UploadBatchFactory,
     UserFactory,
 )
 
@@ -27,10 +29,12 @@ def authenticated_api_client(user) -> APIClient:
 
 
 register(DatasetFactory)
-register(UserFactory)
-register(ImageFactory)
 register(FeatureImageFactory)
+register(ImageFactory)
 register(JacobianImageFactory)
+register(PendingUploadFactory)
 register(RegisteredImageFactory)
 register(SegmentedImageFactory)
 register(T1AtlasFactory)
+register(UploadBatchFactory)
+register(UserFactory)

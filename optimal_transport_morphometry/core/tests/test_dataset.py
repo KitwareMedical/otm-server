@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm, get_users_with_perms
 import pytest
 
-from optimal_transport_morphometry.core.models.dataset import Dataset
+from optimal_transport_morphometry.core.models import Dataset, Image
 
 from . import fuzzy
 
@@ -420,3 +420,19 @@ def test_dataset_get_collaborators(api_client, user_factory, dataset_factory):
     api_client.force_authenticate(user3)
     r = api_client.get(f'/api/v1/datasets/{dataset.pk}/collaborators')
     assert r.status_code == 403
+
+
+@pytest.mark.django_db
+def test_dataset_list_images(api_client, user_factory, image_factory, dataset_factory):
+    user1: User = user_factory()
+
+    # Create dataset with user1 as owner and user2 as collaborator
+    dataset: Dataset = dataset_factory(name='test', owner=user1)
+    image: Image = image_factory(dataset=dataset)
+
+    # Assert owner can view collaborators
+    api_client.force_authenticate(user1)
+    r = api_client.get(f'/api/v1/datasets/{dataset.pk}/images')
+    assert r.status_code == 200
+    assert r.json()['count'] == 1
+    assert r.json()['results'][0]['id'] == image.id

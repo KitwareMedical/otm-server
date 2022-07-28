@@ -7,9 +7,10 @@ from optimal_transport_morphometry.core.models import (
     FeatureImage,
     Image,
     JacobianImage,
-    Patient,
+    PendingUpload,
     RegisteredImage,
     SegmentedImage,
+    UploadBatch,
 )
 
 
@@ -21,13 +22,6 @@ class UserFactory(factory.django.DjangoModelFactory):
     email = factory.Faker('safe_email')
     first_name = factory.Faker('first_name')
     last_name = factory.Faker('last_name')
-
-
-class PatientFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = Patient
-
-    identifier = factory.Faker('uuid4')
 
 
 class T1AtlasFactory(factory.django.DjangoModelFactory):
@@ -47,6 +41,21 @@ class DatasetFactory(factory.django.DjangoModelFactory):
     owner = factory.SubFactory(UserFactory)
 
 
+class UploadBatchFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = UploadBatch
+
+    dataset = factory.SubFactory(DatasetFactory)
+
+
+class PendingUploadFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PendingUpload
+
+    name = factory.Faker('file_name', category='image')
+    batch = factory.SubFactory(UploadBatchFactory)
+
+
 class ImageFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Image
@@ -54,7 +63,6 @@ class ImageFactory(factory.django.DjangoModelFactory):
     name = factory.Faker('file_name', category='image')
     blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
     dataset = factory.SubFactory(DatasetFactory)
-    patient = factory.SubFactory(PatientFactory)
 
 
 class FeatureImageFactory(factory.django.DjangoModelFactory):

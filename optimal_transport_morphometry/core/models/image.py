@@ -8,7 +8,6 @@ from s3_file_field import S3FileField
 
 from .dataset import Dataset
 from .metadata import MetadataField
-from .patient import Patient
 
 
 class ImageType(Enum):
@@ -24,7 +23,6 @@ class Image(TimeStampedModel, models.Model):
     type = models.CharField(max_length=100, default=ImageType.structural_mri)
     blob = S3FileField()
     dataset = models.ForeignKey(Dataset, on_delete=models.CASCADE, related_name='images')
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='images')
     metadata = MetadataField()
 
     @property

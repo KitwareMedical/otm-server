@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from django.contrib.auth.models import User
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
+from guardian.shortcuts import get_objects_for_user
 
 
 class Dataset(TimeStampedModel, models.Model):
@@ -34,10 +37,26 @@ class Dataset(TimeStampedModel, models.Model):
         if not user.is_authenticated:
             return None
 
-        if user == self.owner:
+        if user.id == self.owner_id:
             return 'owner'
 
         if user.has_perm('collaborator', self):
             return 'collaborator'
 
         return None
+
+    @staticmethod
+    def visible_datasets(user: User) -> models.QuerySet[Dataset]:
+        # Handle unauthenticated user
+        if not user.is_authenticated:
+            return Dataset.objects.filter(public=True)
+
+        # Construct queryset for all shared datasets
+        shared_pks = get_objects_for_user(
+            user, 'collaborator', Dataset, with_superuser=False
+        ).values_list('id', flat=True)
+
+        # Return all public, shared and owned datasets
+        return Dataset.objects.filter(
+            models.Q(public=True) | models.Q(owner_id=user.id) | models.Q(pk__in=shared_pks)
+        )
