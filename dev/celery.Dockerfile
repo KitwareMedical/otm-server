@@ -5,9 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install system librarires for Python and R
 RUN apt clean && apt-get update && \
     apt-get install --no-install-recommends --yes \
-    git gcc \
+    git gcc curl \
     libc6-dev libpq-dev libpng-dev \
-    python3 python3-pip python3-setuptools python3-dev \
+    python3.9 python3.9-dev python3-setuptools \
     texlive-latex-base texlive-latex-extra \
     parallel \
     xorg libx11-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev && \
@@ -15,6 +15,12 @@ RUN apt clean && apt-get update && \
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+
+# Install pip
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3.9 get-pip.py && rm get-pip.py
+
+# For some reason this is needed
+RUN pip3 install cffi
 
 # Only copy the setup.py, it will still force all install_requires to be installed,
 # but find_packages() will find nothing (which is fine). When Docker Compose mounts the real source
