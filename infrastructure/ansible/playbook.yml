@@ -3,43 +3,40 @@
   hosts: all
   become: yes
 
+  pre_tasks:
+    - name: Install system Python
+      ansible.builtin.apt:
+        name:
+          - python3.9
+          - python3.9-dev
+          - python3.9-venv
+          - python3-pip
+          - python3-setuptools
+        update_cache: true
+      become_user: root
+
+    - name: Set python3.9 as python3
+      ansible.builtin.command: update-alternatives --install /usr/local/bin/python3 python3 /usr/bin/python3.9 40
+      become: true
+      become_user: root
+
+    - name: Install R
+      ansible.builtin.shell: |
+        apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+        add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
+        apt install r-base
+      become: true
+      become_user: root
+
   roles:
-    # - role: geerlingguy.pip
-    - role: geerlingguy.docker
-
-  tasks:
-    # Install project w/ celery requirements
-    - name: Copy project
-      synchronize:
-        src: "{{ playbook_dir }}/../../"
-        dest: /opt/django-project
-        # rsync_opts:
-        #   - --include=manage.py
-        #   - --include=setup.py
-        #   - --include=optimal_transport_morphometry
-        #   - --include=sample_data
-
-    - name: Create the /opt/otm directory
-      ansible.builtin.file:
-        path: /opt/otm
-        state: directory
-        mode: '0755'
-
-    - name: Copy docker file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/worker.Dockerfile"
-        dest: "/opt/otm/Dockerfile"
-
-    # - name: Build docker image
-    #   command: docker build -t otm-worker -f /opt/otm/Dockerfile /opt/django-project/
-
-    # # Required for postgres use
-    # - name: Install Project requirements
-    #   apt:
-    #     name: libpq-dev
-
-    # # Install project
-    # - name: Install Project
-    #   pip:
-    #     executable: pip3
-    #     name: /opt/django-project[worker]
+    - role: girder.celery
+      vars:
+        celery_app: optimal_transport_morphometry.celery
+        celery_repository_url: https://github.com/girder/otm-server
+        celery_environment:
+          DJANGO_CONFIGURATION: ProductionConfiguration
+          DJANGO_STORAGE_BUCKET_NAME: "{{ ansible_env.DJANGO_STORAGE_BUCKET_NAME }}"
+          DJANGO_DATABASE_URL: "{{ ansible_env.DJANGO_DATABASE_URL }}"
+          DJANGO_CELERY_BROKER_URL: "{{ ansible_env.DJANGO_CELERY_BROKER_URL }}"
+          AWS_ACCESS_KEY_ID: "{{ ansible_env.AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "{{ ansible.AWS_SECRET_ACCESS_KEY }}"
