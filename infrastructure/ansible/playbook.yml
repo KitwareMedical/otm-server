@@ -1,0 +1,45 @@
+---
+- name: Install project
+  hosts: all
+  become: yes
+
+  roles:
+    # - role: geerlingguy.pip
+    - role: geerlingguy.docker
+
+  tasks:
+    # Install project w/ celery requirements
+    - name: Copy project
+      synchronize:
+        src: "{{ playbook_dir }}/../../"
+        dest: /opt/django-project
+        # rsync_opts:
+        #   - --include=manage.py
+        #   - --include=setup.py
+        #   - --include=optimal_transport_morphometry
+        #   - --include=sample_data
+
+    - name: Create the /opt/otm directory
+      ansible.builtin.file:
+        path: /opt/otm
+        state: directory
+        mode: '0755'
+
+    - name: Copy docker file
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/worker.Dockerfile"
+        dest: "/opt/otm/Dockerfile"
+
+    # - name: Build docker image
+    #   command: docker build -t otm-worker -f /opt/otm/Dockerfile /opt/django-project/
+
+    # # Required for postgres use
+    # - name: Install Project requirements
+    #   apt:
+    #     name: libpq-dev
+
+    # # Install project
+    # - name: Install Project
+    #   pip:
+    #     executable: pip3
+    #     name: /opt/django-project[worker]

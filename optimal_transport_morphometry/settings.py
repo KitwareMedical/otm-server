@@ -20,6 +20,8 @@ class OptimalTransportMorphometryMixin(ConfigMixin):
 
     BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 
+    CELERY_TASK_ACKS_LATE = True
+
     @staticmethod
     def mutate_configuration(configuration: ComposedConfiguration) -> None:
         # Install local apps first, to ensure any overridden resources are found first
