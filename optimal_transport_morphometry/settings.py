@@ -3,11 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from composed_configuration import (
+    CeleryMixin,
     ComposedConfiguration,
     ConfigMixin,
     DevelopmentBaseConfiguration,
     HerokuProductionBaseConfiguration,
     ProductionBaseConfiguration,
+    S3StorageMixin,
+    SmtpEmailMixin,
     TestingBaseConfiguration,
 )
 
@@ -62,5 +65,11 @@ class ProductionConfiguration(OptimalTransportMorphometryMixin, ProductionBaseCo
 
 class HerokuProductionConfiguration(
     OptimalTransportMorphometryMixin, HerokuProductionBaseConfiguration
+):
+    pass
+
+
+class CeleryWorkerConfiguration(
+    OptimalTransportMorphometryMixin, CeleryMixin, SmtpEmailMixin, S3StorageMixin
 ):
     pass
