@@ -24,7 +24,7 @@
       ansible.builtin.shell: |
         apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
         add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
-        apt install r-base
+        apt install -y r-base
       become: true
       become_user: root
 
@@ -33,10 +33,17 @@
       vars:
         celery_app: optimal_transport_morphometry.celery
         celery_repository_url: https://github.com/girder/otm-server
+        celery_repository_ref: more-infrastructure
         celery_environment:
-          DJANGO_CONFIGURATION: ProductionConfiguration
-          DJANGO_STORAGE_BUCKET_NAME: "{{ ansible_env.DJANGO_STORAGE_BUCKET_NAME }}"
-          DJANGO_DATABASE_URL: "{{ ansible_env.DJANGO_DATABASE_URL }}"
-          DJANGO_CELERY_BROKER_URL: "{{ ansible_env.DJANGO_CELERY_BROKER_URL }}"
-          AWS_ACCESS_KEY_ID: "{{ ansible_env.AWS_ACCESS_KEY_ID }}"
-          AWS_SECRET_ACCESS_KEY: "{{ ansible.AWS_SECRET_ACCESS_KEY }}"
+          DJANGO_CONFIGURATION: CeleryWorkerConfiguration
+          # DB
+          DJANGO_DATABASE_URL: "{{ lookup('env', 'DJANGO_DATABASE_URL') }}"
+          # Celery
+          DJANGO_CELERY_BROKER_URL: "{{ lookup('env', 'DJANGO_CELERY_BROKER_URL') }}"
+          # Email
+          DJANGO_EMAIL_URL: "{{ lookup('env', 'DJANGO_EMAIL_URL') }}"
+          DJANGO_DEFAULT_FROM_EMAIL: "{{ lookup('env', 'DJANGO_DEFAULT_FROM_EMAIL') }}"
+          # S3
+          DJANGO_STORAGE_BUCKET_NAME: "{{ lookup('env', 'DJANGO_STORAGE_BUCKET_NAME') }}"
+          AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+          AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"

@@ -13,6 +13,7 @@ from composed_configuration import (
     SmtpEmailMixin,
     TestingBaseConfiguration,
 )
+from configurations import values
 
 _pkg = 'optimal_transport_morphometry'
 
@@ -72,4 +73,5 @@ class HerokuProductionConfiguration(
 class CeleryWorkerConfiguration(
     OptimalTransportMorphometryMixin, CeleryMixin, SmtpEmailMixin, S3StorageMixin
 ):
-    pass
+    # Require `DJANGO_CELERY_BROKER_URL` environment variable
+    CELERY_BROKER_URL = values.Value(environ_name='CELERY_BROKER_URL', environ_required=True)
