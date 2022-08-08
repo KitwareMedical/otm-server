@@ -129,7 +129,7 @@ class DatasetPermissions(BasePermission):
         if not user.is_authenticated:
             raise NotAuthenticated()
 
-        if dataset.access(user) is None:
+        if dataset.user_access(user) is None:
             raise PermissionDenied()
 
         # Nothing wrong, permission allowed
@@ -155,7 +155,7 @@ class DatasetViewSet(ModelViewSet):
         user: User = request.user
 
         # Add field to denote write access
-        dataset.access = dataset.access(user)
+        dataset.access = dataset.user_access(user)
 
         return Response(DatasetDetailSerializer(dataset).data)
 
@@ -294,7 +294,7 @@ class DatasetViewSet(ModelViewSet):
         # Retrieve collaborators
         user: User = request.user
         dataset: Dataset = self.get_object()
-        if dataset.access(user) is None:
+        if dataset.user_access(user) is None:
             raise PermissionDenied('Must be owner or collaborator to view collaborators')
 
         # Return user list

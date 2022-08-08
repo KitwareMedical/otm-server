@@ -32,7 +32,7 @@ class Dataset(TimeStampedModel, models.Model):
             models.UniqueConstraint(fields=['name', 'owner'], name='unique_owner_dataset_name')
         ]
 
-    def access(self, user: User):
+    def user_access(self, user: User):
         # Must check this before passing to user.has_perm
         if not user.is_authenticated:
             return None

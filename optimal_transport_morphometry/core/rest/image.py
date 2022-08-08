@@ -45,7 +45,7 @@ class ImagePermissions(BasePermission):
         if not user.is_authenticated:
             raise NotAuthenticated()
 
-        if dataset.access(user) is None:
+        if dataset.user_access(user) is None:
             raise PermissionDenied()
 
         # Nothing wrong, permission allowed
@@ -99,7 +99,7 @@ class ImageViewSet(
 
         # If found, ensure user has write access
         dataset: Dataset = upload.batch.dataset
-        if dataset.access(request.user) is None:
+        if dataset.user_access(request.user) is None:
             raise PermissionDenied()
 
         # TODO validate existence of key in storage
