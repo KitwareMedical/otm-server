@@ -86,6 +86,30 @@ def test_dataset_retrieve(api_client, user_factory, dataset_factory):
 
 
 @pytest.mark.django_db
+def test_dataset_retrieve_extra(
+    api_client, user, dataset_factory, image_factory, upload_batch_factory
+):
+    # Create a public dataset with user1 as owner and user2 as collaborator
+    dataset: Dataset = dataset_factory(owner=user, public=True)
+
+    api_client.force_authenticate(user)
+    r = api_client.get(f'/api/v1/datasets/{dataset.id}')
+    assert r.status_code == 200
+    assert r.json()['uploads_active'] is False
+    assert r.json()['image_count'] == 0
+
+    # Create an image and upload batche for this dataset
+    image_factory(dataset=dataset)
+    upload_batch_factory(dataset=dataset)
+
+    # Ensure updated
+    r = api_client.get(f'/api/v1/datasets/{dataset.id}')
+    assert r.status_code == 200
+    assert r.json()['uploads_active'] is True
+    assert r.json()['image_count'] == 1
+
+
+@pytest.mark.django_db
 def test_dataset_retrieve_private(api_client, user_factory, dataset_factory):
     user1: User = user_factory()
     user2: User = user_factory()

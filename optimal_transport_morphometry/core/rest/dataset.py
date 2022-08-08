@@ -4,6 +4,8 @@ from typing import List
 from celery.result import AsyncResult
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.db.models import Count, Exists, OuterRef
+from django.shortcuts import get_object_or_404
 from drf_yasg.utils import no_body, swagger_auto_schema
 from guardian.shortcuts import assign_perm, get_objects_for_user, get_users_with_perms, remove_perm
 from rest_framework import serializers, status
@@ -65,7 +67,10 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
             'public',
             'preprocessing_status',
             'analysis_status',
+            # Extra
             'access',
+            'uploads_active',
+            'image_count',
         ]
         read_only_fields = fields
 
@@ -75,6 +80,9 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
         read_only=True,
         choices=['admin', 'write', None],
     )
+
+    uploads_active = serializers.BooleanField()
+    image_count = serializers.IntegerField()
 
 
 class DatasetListQuerySerializer(serializers.Serializer):
@@ -151,12 +159,23 @@ class DatasetViewSet(ModelViewSet):
         responses={200: DatasetDetailSerializer()},
     )
     def retrieve(self, request, pk):
-        dataset: Dataset = self.get_object()
-        user: User = request.user
+        # Annotate image count and if uploads exist
+        queryset = self.filter_queryset(self.get_queryset())
+        queryset = queryset.annotate(
+            image_count=Count('images', distinct=True),
+            uploads_active=Exists(
+                UploadBatch.objects.filter(dataset_id=OuterRef('id')),
+            ),
+        )
+
+        # Retrieve dataset and check permissions
+        dataset = get_object_or_404(queryset, id=pk)
+        self.check_object_permissions(self.request, dataset)
 
         # Add field to denote write access
-        dataset.access = dataset.user_access(user)
+        dataset.access = dataset.user_access(request.user)
 
+        # Return response
         return Response(DatasetDetailSerializer(dataset).data)
 
     @swagger_auto_schema(
