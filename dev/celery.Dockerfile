@@ -27,7 +27,7 @@ RUN pip3 install cffi
 # over top of this directory, the .egg-link in site-packages resolves to the mounted directory
 # and all package modules are importable.
 COPY ./setup.py /opt/django-project/setup.py
-RUN pip3 install --editable /opt/django-project[dev]
+RUN pip3 install --editable /opt/django-project[dev,worker]
 RUN pip3 install django-s3-file-field[minio]
 
 # Clone UTM R scripts and install packages
