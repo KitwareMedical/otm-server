@@ -111,7 +111,7 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
         feature_img = seg['segmentation'].copy()
         feature_img_view = feature_img.view()
         feature_img_view.fill(0)
-        feature_img_view[seg_img_view == 3] = 1  # 3 is white matter label
+        feature_img_view[seg_img_view == 2] = 1  # 2 is grey matter label, 3 is white matter label
 
         intensity_img_view = jac_img.view()
         feature_img_view *= intensity_img_view
