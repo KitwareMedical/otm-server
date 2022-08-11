@@ -149,6 +149,7 @@ def run_utm(dataset_id: int):
         variables = []
         for image in dataset.images.all():
             meta = image.metadata
+            meta['name'].setdefault('name', image.name)
             variables.append(meta)
 
             feature_image = image.feature_images.first()
