@@ -62,7 +62,7 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
         mask_view[priors[i].numpy() > 0] = 1
     mask_view[mask_view > 0] = 1
 
-    for image in dataset.images.all():
+    for image in dataset.images.order_by('name').all():
         if replace:
             _delete_preprocessing_artifacts(image)
         elif _already_preprocessed(image):

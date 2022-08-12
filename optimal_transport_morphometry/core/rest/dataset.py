@@ -328,7 +328,9 @@ class DatasetViewSet(ModelViewSet):
     @action(detail=True, methods=['get'])
     def preprocessed_images(self, request, pk):
         dataset: Dataset = self.get_object()
-        dataset_images: List[Image] = self.paginate_queryset(Image.objects.filter(dataset=dataset))
+        dataset_images: List[Image] = self.paginate_queryset(
+            Image.objects.filter(dataset=dataset).order_by('name')
+        )
 
         # Create map and start assigning processed images to each
         # We do this so we can make ~4 queries, as opposed to O(n) queries
@@ -392,7 +394,7 @@ class DatasetViewSet(ModelViewSet):
     @action(detail=True, methods=['GET'])
     def images(self, request, pk: str):
         dataset: Dataset = self.get_object()
-        images = Image.objects.filter(dataset=dataset)
+        images = Image.objects.filter(dataset=dataset).order_by('name')
         return self.get_paginated_response(
             ImageSerializer(self.paginate_queryset(images), many=True).data
         )
