@@ -85,15 +85,15 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
 
         reg_model = models.RegisteredImage(source_image=image, atlas=atlas)
         reg_img = reg['warpedmovout']
-        with NamedTemporaryFile(suffix='registered.nii') as tmp:
+        with NamedTemporaryFile(suffix='registered.nii.gz') as tmp:
             ants.image_write(reg_img, tmp.name)
-            reg_model.blob = File(tmp, name='registered.nii')
+            reg_model.blob = File(tmp, name='registered.nii.gz')
             reg_model.save()
 
         jac_model = models.JacobianImage(source_image=image, atlas=atlas)
-        with NamedTemporaryFile(suffix='jacobian.nii') as tmp:
+        with NamedTemporaryFile(suffix='jacobian.nii.gz') as tmp:
             ants.image_write(jac_img, tmp.name)
-            jac_model.blob = File(tmp, name='jacobian.nii')
+            jac_model.blob = File(tmp, name='jacobian.nii.gz')
             jac_model.save()
 
         print(f'Running segmentation: {image.name}')
@@ -101,9 +101,9 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
         del reg_img
 
         seg_model = models.SegmentedImage(source_image=image, atlas=atlas)
-        with NamedTemporaryFile(suffix='segmented.nii') as tmp:
+        with NamedTemporaryFile(suffix='segmented.nii.gz') as tmp:
             ants.image_write(seg['segmentation'], tmp.name)
-            seg_model.blob = File(tmp, name='segmented.nii')
+            seg_model.blob = File(tmp, name='segmented.nii.gz')
             seg_model.save()
 
         print(f'Creating feature image: {image.name}')
@@ -123,9 +123,9 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
         feature_model = models.FeatureImage(
             source_image=image, atlas=atlas, downsample_factor=downsample
         )
-        with NamedTemporaryFile(suffix='feature.nii') as tmp:
+        with NamedTemporaryFile(suffix='feature.nii.gz') as tmp:
             ants.image_write(feature_img, tmp.name)
-            feature_model.blob = File(tmp, name='feature.nii')
+            feature_model.blob = File(tmp, name='feature.nii.gz')
             feature_model.save()
 
     dataset.preprocessing_status = models.Dataset.ProcessStatus.FINISHED
