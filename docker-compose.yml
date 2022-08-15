@@ -1,10 +1,18 @@
 version: '3'
 services:
-  postgres:
-    image: postgres:latest
-    environment:
-      POSTGRES_DB: django
-      POSTGRES_PASSWORD: postgres
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: [
+      "bash", "-c",
+      "/usr/bin/shiny-server /etc/shiny-server/shiny-server.conf &
+      celery --app optimal_transport_morphometry.celery worker --loglevel INFO --without-heartbeat"
+    ]
+    restart: unless-stopped
+    # Docker Compose does not set the TTY width, which causes Celery errors
+    tty: false
+    env_file: .env
     ports:
       - ${DOCKER_POSTGRES_PORT-5432}:5432
 
