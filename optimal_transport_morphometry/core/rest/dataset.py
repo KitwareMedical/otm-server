@@ -3,7 +3,7 @@ from typing import List
 
 from celery.result import AsyncResult
 from django.contrib.auth.models import User
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef
 from django.shortcuts import get_object_or_404
 from drf_yasg.utils import no_body, swagger_auto_schema
@@ -410,7 +410,13 @@ class DatasetViewSet(ModelViewSet):
 
         dataset: Dataset = self.get_object()
         csvfile = codecs.iterdecode(serializer.validated_data['csvfile'], 'utf-8')
-        batch = load_batch_from_csv(csvfile, dest=dataset)
+
+        # Catch if upload doesn't contain any unique images
+        try:
+            batch = load_batch_from_csv(csvfile, dataset=dataset)
+        except IntegrityError:
+            raise serializers.ValidationError('No new images (all included images already exist)')
+
         serializer = UploadBatchSerializer(batch)
         return Response(serializer.data, status=201)
 

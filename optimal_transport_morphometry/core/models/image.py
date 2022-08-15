@@ -18,6 +18,9 @@ class Image(TimeStampedModel, models.Model):
     class Meta:
         indexes = [models.Index(fields=['dataset'])]
         ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(fields=['dataset', 'name'], name='unique_dataset_image_name'),
+        ]
 
     name = models.CharField(max_length=255)
     type = models.CharField(max_length=100, default=ImageType.structural_mri)
