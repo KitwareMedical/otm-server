@@ -44,7 +44,7 @@ def command(csv: TextIO, email: str, dataset_name: str, clear: bool, include_ima
     # Add dataset and pending upload batch
     print('Ingesting upload batch and pending upload...')
     dataset, _ = Dataset.objects.get_or_create(name=dataset_name, owner=owner)
-    batch = load_batch_from_csv(csv, dest=dataset)
+    batch = load_batch_from_csv(csv, dataset=dataset)
 
     # Automatically ingest images if desired
     if include_images:
