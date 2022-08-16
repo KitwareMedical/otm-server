@@ -19,11 +19,13 @@ class Dataset(TimeStampedModel, models.Model):
         FAILED = 'Failed'
 
     # Preprocessing/analysis statuses
-    preprocessing_status = models.CharField(
-        max_length=32, choices=ProcessStatus.choices, default=ProcessStatus.PENDING
-    )
     analysis_status = models.CharField(
         max_length=32, choices=ProcessStatus.choices, default=ProcessStatus.PENDING
+    )
+
+    # Current preprocess batch
+    current_preprocessing_batch = models.OneToOneField(
+        'PreprocessingBatch', on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
     )
 
     class Meta:

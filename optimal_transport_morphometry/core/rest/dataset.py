@@ -18,14 +18,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
-from optimal_transport_morphometry.core.models import (
-    Dataset,
-    FeatureImage,
-    Image,
-    JacobianImage,
-    RegisteredImage,
-    SegmentedImage,
-)
+from optimal_transport_morphometry.core.models import Dataset, Image
 from optimal_transport_morphometry.core.models.upload_batch import UploadBatch
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
 from optimal_transport_morphometry.core.rest.preprocessing import (
@@ -48,10 +41,10 @@ class DatasetSerializer(serializers.ModelSerializer):
             'name',
             'description',
             'public',
-            'preprocessing_status',
+            'current_preprocessing_batch',
             'analysis_status',
         ]
-        read_only_fields = ['id', 'preprocessing_status', 'analysis_status']
+        read_only_fields = ['id', 'analysis_status', 'current_preprocessing_batch']
 
     # Set default value
     public = serializers.BooleanField(default=False)
@@ -65,7 +58,7 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
             'name',
             'description',
             'public',
-            'preprocessing_status',
+            'current_preprocessing_batch',
             'analysis_status',
             # Extra
             'access',
@@ -89,19 +82,6 @@ class DatasetListQuerySerializer(serializers.Serializer):
     # Add fields for filtering
     name = serializers.CharField(required=False)
     access = serializers.ChoiceField(choices=['public', 'shared', 'owned'], required=False)
-
-
-class ImageGroupSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Image
-        new_fields = ['registered', 'jacobian', 'segmented', 'feature']
-        fields = ImageSerializer.Meta.fields + new_fields
-        read_only_fields = ImageSerializer.Meta.fields + new_fields
-
-    registered = RegisteredImageSerializer(allow_null=True)
-    jacobian = JacobianImageSerializer(allow_null=True)
-    segmented = SegmentedImageSerializer(allow_null=True)
-    feature = FeatureImageSerializer(allow_null=True)
 
 
 class CreateBatchSerializer(serializers.Serializer):
@@ -319,35 +299,6 @@ class DatasetViewSet(ModelViewSet):
         # Return user list
         users = get_users_with_perms(dataset, only_with_perms_in=['collaborator'])
         return Response(UserSerializer(instance=users, many=True).data, status=status.HTTP_200_OK)
-
-    @swagger_auto_schema(
-        operation_description='Retrieve the preprocessed images, as annotated onto each image'
-        ' entry for this dataset.',
-        query_serializer=LimitOffsetSerializer,
-    )
-    @action(detail=True, methods=['get'])
-    def preprocessed_images(self, request, pk):
-        dataset: Dataset = self.get_object()
-        dataset_images: List[Image] = self.paginate_queryset(
-            Image.objects.filter(dataset=dataset).order_by('name')
-        )
-
-        # Create map and start assigning processed images to each
-        # We do this so we can make ~4 queries, as opposed to O(n) queries
-        image_map = {im.id: im for im in dataset_images}
-        image_classes = [
-            (RegisteredImage, 'registered'),
-            (JacobianImage, 'jacobian'),
-            (SegmentedImage, 'segmented'),
-            (FeatureImage, 'feature'),
-        ]
-        for klass, key in image_classes:
-            qs = klass.objects.filter(source_image__in=dataset_images).distinct('source_image')
-            for image in qs.iterator():
-                setattr(image_map[image.source_image_id], key, image)
-
-        serializer = ImageGroupSerializer(image_map.values(), many=True)
-        return self.get_paginated_response(serializer.data)
 
     @swagger_auto_schema(
         operation_description='Start preprocessing on a dataset.',

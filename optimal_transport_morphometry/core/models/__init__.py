@@ -3,7 +3,13 @@ from .dataset import Dataset
 from .image import Image
 from .patient import Patient
 from .pending_upload import PendingUpload
-from .preprocessing import FeatureImage, JacobianImage, RegisteredImage, SegmentedImage
+from .preprocessing import (
+    FeatureImage,
+    JacobianImage,
+    PreprocessingBatch,
+    RegisteredImage,
+    SegmentedImage,
+)
 from .upload_batch import UploadBatch
 
 __all__ = [
@@ -14,6 +20,7 @@ __all__ = [
     'Image',
     'Patient',
     'PendingUpload',
+    'PreprocessingBatch',
     'SegmentedImage',
     'RegisteredImage',
     'UploadBatch',
