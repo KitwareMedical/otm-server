@@ -121,7 +121,7 @@ In order to set up authentication for your local development environment, you ne
 
 The settings for your new application should be as follows:
 
-* Redirect URLs: http://localhost:8080/ (trailing slash matters)
+* Redirect URLs: http://localhost:8080/datasets/ (trailing slash matters)
 * Client type: Public
 * Authorization grant type: Authorization code
 * Client Secret: empty
