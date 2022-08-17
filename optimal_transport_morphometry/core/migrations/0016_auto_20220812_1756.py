@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0014_auto_20220721_2041'),
+        ('core', '0015_image_unique_dataset_image_name'),
     ]
 
     operations = [
