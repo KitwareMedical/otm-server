@@ -52,7 +52,7 @@ def ensure_preprocessing_batch(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0015_auto_20220812_1756'),
+        ('core', '0015_image_unique_dataset_image_name'),
     ]
 
     operations = [
