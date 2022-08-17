@@ -32,10 +32,10 @@ def command(csv: TextIO, email: str, dataset_name: str, clear: bool, include_ima
         raise ClickException(f'Owner not found with email: {owner}')
 
     for name in ['grey', 'white', 'csf', 'T1']:
-        if not Atlas.objects.filter(name=f'{name}.nii').exists():
+        if not Atlas.objects.filter(name=f'{name}.nii.gz').exists():
             print(f'Uploading {name} atlas')
-            with open(f'sample_data/atlases/{name}.nii', 'rb') as fd:
-                Atlas.objects.create(name=f'{name}.nii', blob=File(fd, name=f'{name}.nii'))
+            with open(f'sample_data/atlases/{name}.nii.gz', 'rb') as fd:
+                Atlas.objects.create(name=f'{name}.nii.gz', blob=File(fd, name=f'{name}.nii.gz'))
 
     if clear:
         print('Deleting all upload batches')
