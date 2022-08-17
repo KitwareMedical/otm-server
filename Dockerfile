@@ -24,7 +24,7 @@ RUN pip3 install cffi
 
 # Install
 ADD . /opt/django-project
-RUN pip3 install /opt/django-project[dev,worker]
+RUN pip3 install -e /opt/django-project[dev,worker]
 
 # Clone UTM R scripts and install packages
 RUN git clone https://github.com/KitwareMedical/UTM /opt/UTM
