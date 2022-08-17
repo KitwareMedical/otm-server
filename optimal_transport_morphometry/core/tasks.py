@@ -137,7 +137,9 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
             shape = np.round(np.asarray(feature_img.shape) / downsample)
             feature_img = ants.resample_image(feature_img, shape, True)
 
-        feature_model = models.FeatureImage(**common_model_args, downsample_factor=downsample)
+        feature_model = models.FeatureImage(
+            **common_model_args, metadata={'downsample_factor': downsample}
+        )
         with NamedTemporaryFile(suffix='feature.nii.gz') as tmp:
             ants.image_write(feature_img, tmp.name)
             feature_model.blob = File(tmp, name='feature.nii.gz')

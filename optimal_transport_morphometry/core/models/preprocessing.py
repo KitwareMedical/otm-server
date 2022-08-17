@@ -62,42 +62,62 @@ class PreprocessingBatch(TimeStampedModel):
     #     return super().save(**kwargs)
 
 
-class AbstractPreprocessedImage(TimeStampedModel):
+class PreprocessedImageType(models.TextChoices):
+    FEATURE = 'Feature'
+    JACOBIAN = 'Jacobian'
+    REGISTERED = 'Registered'
+    SEGMENTED = 'Segmented'
+
+
+class PreprocessedImage(TimeStampedModel):
     """Base class that preprocessed images inherit from."""
 
+    ImageType = PreprocessedImageType
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    ~models.Q(image_type=PreprocessedImageType.FEATURE)
+                    | models.Q(metadata__downsample_factor__isnull=False)
+                ),
+                name='feature_image_required_downsample_factor',
+            ),
+            models.CheckConstraint(
+                check=(
+                    ~models.Q(image_type=PreprocessedImageType.REGISTERED)
+                    | models.Q(metadata__registration_type__isnull=False)
+                ),
+                name='registered_image_required_registration_type',
+            ),
+        ]
+
+    # To keep track of data specific to any image type
+    metadata = models.JSONField()
+
     blob = S3FileField()
+    image_type = models.CharField(max_length=32, choices=ImageType.choices)
+    atlas = models.ForeignKey(Atlas, on_delete=models.PROTECT, related_name='preprocessed_images')
     source_image = models.ForeignKey(
         Image,
         on_delete=models.CASCADE,
-        related_name='%(app_label)s_%(class)ss',
+        related_name='preprocessed_images',
         db_index=True,
-    )
-    atlas = models.ForeignKey(
-        Atlas, on_delete=models.PROTECT, related_name='%(app_label)s_%(class)ss'
     )
 
     # The preprocessing batch this preprocessed image belongs to
     preprocessing_batch = models.ForeignKey(
         PreprocessingBatch,
         on_delete=models.CASCADE,
-        related_name='%(app_label)s_%(class)s',
+        related_name='preprocessed_images',
     )
 
-    class Meta:
-        abstract = True
+    def save(self, **kwargs):
+        """Override save to ensure metadata is set."""
+        if self.image_type == PreprocessedImageType.FEATURE:
+            self.metadata.setdefault('downsample_factor', 3)
 
+        if self.image_type == PreprocessedImageType.REGISTERED:
+            self.metadata.setdefault('registration_type', 'affine')
 
-class FeatureImage(AbstractPreprocessedImage):
-    downsample_factor = models.FloatField()
-
-
-class JacobianImage(AbstractPreprocessedImage):
-    pass
-
-
-class RegisteredImage(AbstractPreprocessedImage):
-    registration_type = models.CharField(max_length=100, default='affine')
-
-
-class SegmentedImage(AbstractPreprocessedImage):
-    pass
+        return super().save(**kwargs)
