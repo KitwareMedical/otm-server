@@ -16,7 +16,7 @@ class PreprocessingBatchAdmin(admin.ModelAdmin):
 
 
 class CommonAdmin(admin.ModelAdmin):
-    list_display = ['id', 'atlas', 'blob', 'source_image']
+    list_display = ['id', 'atlas', 'blob', 'source_image', 'preprocessing_batch']
     list_display_links = ['id']
 
 

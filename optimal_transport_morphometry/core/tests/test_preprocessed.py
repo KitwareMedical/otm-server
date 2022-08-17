@@ -7,7 +7,6 @@ from optimal_transport_morphometry.core.models import PreprocessingBatch
 def test_fetch_preprocessed_images(
     user,
     api_client,
-    dataset_factory,
     preprocessing_batch_factory,
     image_factory,
     feature_image_factory,

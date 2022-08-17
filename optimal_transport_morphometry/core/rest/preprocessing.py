@@ -1,8 +1,10 @@
 from django.db import models
+from django.shortcuts import get_object_or_404
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import mixins, serializers
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from optimal_transport_morphometry.core.models import (
@@ -59,6 +61,24 @@ class PreprocessingBatchSerializer(serializers.ModelSerializer):
         fields = ['id', 'created', 'modified', 'dataset', 'status', 'error_message']
 
 
+class PreprocessingBatchDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PreprocessingBatch
+        fields = [
+            'id',
+            'created',
+            'modified',
+            'dataset',
+            'status',
+            'error_message',
+            'progress',
+            'current_image_name',
+        ]
+
+    progress = serializers.FloatField()
+    current_image_name = serializers.CharField(required=False, default=None)
+
+
 class ImageGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
@@ -76,12 +96,38 @@ class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
     queryset = PreprocessingBatch.objects.select_related('dataset').all()
 
     serializer_class = PreprocessingBatchSerializer
+    serializer_detail_class = PreprocessingBatchDetailSerializer
     pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return PreprocessingBatch.objects.filter(
             dataset__in=Dataset.visible_datasets(self.request.user)
         )
+
+    def annotated_queryset(self):
+        qs = self.get_queryset()
+        return qs.annotate(
+            progress=(
+                models.Count('core_featureimage', distinct=True)
+                + models.Count('core_jacobianimage', distinct=True)
+                + models.Count('core_registeredimage', distinct=True)
+                + models.Count('core_segmentedimage', distinct=True)
+            )
+            # TODO: Replace with static field value when added
+            # Must use 4.0 instead of 4 here so it is cast as float
+            / (models.Count('dataset__images', distinct=True) * 4.0)
+        )
+
+    def retrieve(self, request, pk: str):
+        queryset = self.filter_queryset(self.annotated_queryset())
+        batch: PreprocessingBatch = get_object_or_404(queryset, pk=pk)
+
+        # Add image currently being worked on
+        batch.current_image_name = batch.current_image().name
+
+        self.check_object_permissions(self.request, batch)
+        serializer = PreprocessingBatchDetailSerializer(batch)
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         operation_description='Retrieve the images from a preprocessing batch,'
@@ -91,14 +137,7 @@ class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
     @action(detail=True, methods=['GET'])
     def images(self, request, pk: str):
         batch: PreprocessingBatch = self.get_object()
-        batch_images = self.paginate_queryset(
-            Image.objects.filter(
-                models.Q(core_featureimages__preprocessing_batch=batch)
-                | models.Q(core_registeredimages__preprocessing_batch=batch)
-                | models.Q(core_segmentedimages__preprocessing_batch=batch)
-                | models.Q(core_jacobianimages__preprocessing_batch=batch)
-            ).order_by('name')
-        )
+        batch_images = self.paginate_queryset(batch.source_images().order_by('name'))
 
         # Create map and start assigning processed images to each
         # We do this so we can make ~4 queries, as opposed to O(n) queries

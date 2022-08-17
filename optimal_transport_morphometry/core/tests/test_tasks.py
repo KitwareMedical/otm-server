@@ -4,10 +4,11 @@ from optimal_transport_morphometry.core.models import Dataset
 
 
 @pytest.mark.django_db
-def test_dispatch_preprocess(user, api_client, dataset_factory):
+def test_dispatch_preprocess(user, api_client, dataset_factory, image_factory):
     api_client.force_authenticate(user)
 
     dataset: Dataset = dataset_factory(owner=user)
+    image_factory(dataset=dataset)
     r = api_client.post(f'/api/v1/datasets/{dataset.id}/preprocess')
 
     # Assert resp
@@ -20,10 +21,24 @@ def test_dispatch_preprocess(user, api_client, dataset_factory):
 
 
 @pytest.mark.django_db
-def test_dispatch_preprocess_existing(user, api_client, dataset_factory):
+def test_dispatch_preprocess_empty(user, api_client, dataset_factory):
     api_client.force_authenticate(user)
 
     dataset: Dataset = dataset_factory(owner=user)
+    r = api_client.post(f'/api/v1/datasets/{dataset.id}/preprocess')
+
+    # Assert resp
+    assert r.status_code == 400
+    assert r.json() == ['Cannot run preprocessing on empty dataset.']
+
+
+@pytest.mark.django_db
+def test_dispatch_preprocess_existing(user, api_client, dataset_factory, image_factory):
+    api_client.force_authenticate(user)
+
+    dataset: Dataset = dataset_factory(owner=user)
+    image_factory(dataset=dataset)
+
     api_client.post(f'/api/v1/datasets/{dataset.id}/preprocess')
     r = api_client.post(f'/api/v1/datasets/{dataset.id}/preprocess')
 

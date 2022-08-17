@@ -314,6 +314,10 @@ class DatasetViewSet(ModelViewSet):
         ):
             raise serializers.ValidationError('Preprocessing currently running.')
 
+        # Check against empty runs
+        if not dataset.images.count():
+            raise serializers.ValidationError('Cannot run preprocessing on empty dataset.')
+
         # Create new preprocessing batch
         batch = PreprocessingBatch.objects.create(dataset=dataset)
 

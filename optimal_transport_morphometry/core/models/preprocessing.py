@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from s3_file_field import S3FileField
@@ -19,6 +21,45 @@ class PreprocessingBatch(TimeStampedModel):
         Dataset, on_delete=models.CASCADE, related_name='preprocessing_batches'
     )
     error_message = models.TextField(blank=True, default='')
+
+    # The total number of preprocessed images that should be expected in this batch
+    # expected_total = models.PositiveIntegerField()
+
+    def source_images(self) -> models.QuerySet[Image]:
+        """Return all images that are sources to preprocessed images in this batch."""
+        return Image.objects.filter(
+            models.Q(core_featureimages__preprocessing_batch=self)
+            | models.Q(core_registeredimages__preprocessing_batch=self)
+            | models.Q(core_segmentedimages__preprocessing_batch=self)
+            | models.Q(core_jacobianimages__preprocessing_batch=self)
+        ).distinct()
+
+    def current_image(self) -> Optional[Image]:
+        """Return the source image currently being processed, or None."""
+        return (
+            self.dataset.images.order_by('name')
+            .exclude(
+                models.Q(
+                    name__in=self.core_featureimage.values_list('source_image__name', flat=True)
+                )
+                & models.Q(
+                    name__in=self.core_jacobianimage.values_list('source_image__name', flat=True)
+                )
+                & models.Q(
+                    name__in=self.core_registeredimage.values_list('source_image__name', flat=True)
+                )
+                & models.Q(
+                    name__in=self.core_segmentedimage.values_list('source_image__name', flat=True)
+                )
+            )
+            .first()
+        )
+
+    # def save(self, **kwargs):
+    #     if not self.expected_total:
+    #         self.expected_total = self.dataset.images * 4
+
+    #     return super().save(**kwargs)
 
 
 class AbstractPreprocessedImage(TimeStampedModel):
