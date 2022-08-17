@@ -1,157 +1,160 @@
-from django.http import HttpResponseRedirect
+from django.db import models
 from django.shortcuts import get_object_or_404
-from django_filters import rest_framework as filters
-from rest_framework import serializers
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import mixins, serializers
 from rest_framework.decorators import action
-from rest_framework.mixins import ListModelMixin
-from rest_framework.permissions import AllowAny
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from optimal_transport_morphometry.core.models import (
+    Dataset,
     FeatureImage,
     JacobianImage,
+    PreprocessingBatch,
     RegisteredImage,
     SegmentedImage,
 )
+from optimal_transport_morphometry.core.models.image import Image
+from optimal_transport_morphometry.core.rest.image import ImageSerializer
+from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
 
-from .atlas import AtlasSerializer
-from .image import ImageSerializer
-
-# ##############
-# FEATURE IMAGES
-# ##############
+PREPROCESSED_IMAGE_FIELDS = [
+    'id',
+    'created',
+    'modified',
+    'blob',
+    'atlas',
+    'source_image',
+    'preprocessing_batch',
+]
 
 
 class FeatureImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureImage
-        fields = ['id', 'created', 'modified', 'downsample_factor', 'blob']
-
-
-class ExtendedFeatureImageSerializer(serializers.ModelSerializer):
-    atlas = AtlasSerializer()
-    source_image = ImageSerializer()
-
-    class Meta:
-        model = FeatureImage
-        fields = FeatureImageSerializer.Meta.fields + ['atlas', 'source_image']
-
-
-class FeatureImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = FeatureImage.objects.select_related('atlas', 'source_image')
-
-    permission_classes = [AllowAny]
-    serializer_class = FeatureImageSerializer
-
-    filter_backends = [filters.DjangoFilterBackend]
-    filterset_fields = ['source_image', 'source_image__dataset']
-
-    @action(detail=True)
-    def download(self, request, pk=None):
-        image = get_object_or_404(FeatureImage, pk=pk)
-        return HttpResponseRedirect(image.blob.url)
-
-
-# ###############
-# JACOBIAN IMAGES
-# ###############
+        fields = PREPROCESSED_IMAGE_FIELDS + ['downsample_factor']
 
 
 class JacobianImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = JacobianImage
         fields = ['id', 'created', 'modified', 'blob']
-
-
-class ExtendedJacobianImageSerializer(serializers.ModelSerializer):
-    atlas = AtlasSerializer()
-    source_image = ImageSerializer()
-
-    class Meta:
-        model = JacobianImage
-        fields = JacobianImageSerializer.Meta.fields + ['atlas', 'source_image']
-
-
-class JacobianImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = JacobianImage.objects.select_related('atlas', 'source_image')
-
-    permission_classes = [AllowAny]
-    serializer_class = ExtendedJacobianImageSerializer
-
-    filter_backends = [filters.DjangoFilterBackend]
-    filterset_fields = ['source_image', 'source_image__dataset']
-
-    @action(detail=True)
-    def download(self, request, pk=None):
-        image = get_object_or_404(JacobianImage, pk=pk)
-        return HttpResponseRedirect(image.blob.url)
-
-
-# #################
-# REGISTERED IMAGES
-# #################
+        fields = PREPROCESSED_IMAGE_FIELDS
 
 
 class RegisteredImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = RegisteredImage
-        fields = ['id', 'created', 'modified', 'registration_type', 'blob']
-
-
-class ExtendedRegisteredImageSerializer(serializers.ModelSerializer):
-    atlas = AtlasSerializer()
-    source_image = ImageSerializer()
-
-    class Meta:
-        model = RegisteredImage
-        fields = RegisteredImageSerializer.Meta.fields + ['atlas', 'source_image']
-
-
-class RegisteredImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = RegisteredImage.objects.select_related('atlas', 'source_image')
-
-    permission_classes = [AllowAny]
-    serializer_class = ExtendedRegisteredImageSerializer
-
-    filter_backends = [filters.DjangoFilterBackend]
-    filterset_fields = ['source_image', 'source_image__dataset']
-
-    @action(detail=True)
-    def download(self, request, pk=None):
-        image = get_object_or_404(RegisteredImage, pk=pk)
-        return HttpResponseRedirect(image.blob.url)
-
-
-# ################
-# SEGMENTED IMAGES
-# ################
+        fields = PREPROCESSED_IMAGE_FIELDS + ['registration_type']
 
 
 class SegmentedImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = SegmentedImage
-        fields = ['id', 'created', 'modified', 'blob']
+        fields = PREPROCESSED_IMAGE_FIELDS
 
 
-class ExtendedSegmentedImageSerializer(serializers.ModelSerializer):
-    atlas = AtlasSerializer()
-    source_image = ImageSerializer()
-
+class PreprocessingBatchSerializer(serializers.ModelSerializer):
     class Meta:
-        model = SegmentedImage
-        fields = SegmentedImageSerializer.Meta.fields + ['atlas', 'source_image']
+        model = PreprocessingBatch
+        fields = ['id', 'created', 'modified', 'dataset', 'status', 'error_message']
 
 
-class SegmentedImageViewSet(ListModelMixin, GenericViewSet):
-    queryset = SegmentedImage.objects.select_related('atlas', 'source_image')
+class PreprocessingBatchDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PreprocessingBatch
+        fields = [
+            'id',
+            'created',
+            'modified',
+            'dataset',
+            'status',
+            'error_message',
+            'current_image_name',
+            'progress',
+            'expected_image_count',
+        ]
 
-    permission_classes = [AllowAny]
-    serializer_class = ExtendedSegmentedImageSerializer
+    current_image_name = serializers.CharField(required=False, default=None)
+    progress = serializers.FloatField()
+    expected_image_count = serializers.IntegerField()
 
-    filter_backends = [filters.DjangoFilterBackend]
-    filterset_fields = ['source_image', 'source_image__dataset']
 
-    @action(detail=True)
-    def download(self, request, pk=None):
-        image = get_object_or_404(SegmentedImage, pk=pk)
-        return HttpResponseRedirect(image.blob.url)
+class ImageGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        new_fields = ['registered', 'jacobian', 'segmented', 'feature']
+        fields = ImageSerializer.Meta.fields + new_fields
+        read_only_fields = ImageSerializer.Meta.fields + new_fields
+
+    registered = RegisteredImageSerializer(allow_null=True)
+    jacobian = JacobianImageSerializer(allow_null=True)
+    segmented = SegmentedImageSerializer(allow_null=True)
+    feature = FeatureImageSerializer(allow_null=True)
+
+
+class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
+    queryset = PreprocessingBatch.objects.select_related('dataset').all()
+
+    serializer_class = PreprocessingBatchSerializer
+    serializer_detail_class = PreprocessingBatchDetailSerializer
+    pagination_class = LimitOffsetPagination
+
+    def get_queryset(self):
+        return PreprocessingBatch.objects.filter(
+            dataset__in=Dataset.visible_datasets(self.request.user)
+        )
+
+    def annotated_queryset(self):
+        qs = self.get_queryset()
+        return qs.annotate(
+            # Must use 4.0 instead of 4 here so it is cast as float
+            expected_image_count=(models.Count('dataset__images', distinct=True) * 4.0),
+            progress=(
+                models.Count('core_featureimage', distinct=True)
+                + models.Count('core_jacobianimage', distinct=True)
+                + models.Count('core_registeredimage', distinct=True)
+                + models.Count('core_segmentedimage', distinct=True)
+            )
+            # TODO: Replace with static field value when added
+            / models.F('expected_image_count'),
+        )
+
+    def retrieve(self, request, pk: str):
+        queryset = self.filter_queryset(self.annotated_queryset())
+        batch: PreprocessingBatch = get_object_or_404(queryset, pk=pk)
+
+        # Add image currently being worked on
+        batch.current_image_name = getattr(batch.current_image(), 'name', None)
+
+        self.check_object_permissions(self.request, batch)
+        serializer = PreprocessingBatchDetailSerializer(batch)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        operation_description='Retrieve the images from a preprocessing batch,'
+        ' as annotated onto each source image.',
+        query_serializer=LimitOffsetSerializer,
+    )
+    @action(detail=True, methods=['GET'])
+    def images(self, request, pk: str):
+        batch: PreprocessingBatch = self.get_object()
+        batch_images = self.paginate_queryset(batch.source_images().order_by('name'))
+
+        # Create map and start assigning processed images to each
+        # We do this so we can make ~4 queries, as opposed to O(n) queries
+        image_map = {im.id: im for im in batch_images}
+        image_classes = [
+            (RegisteredImage, 'registered'),
+            (JacobianImage, 'jacobian'),
+            (SegmentedImage, 'segmented'),
+            (FeatureImage, 'feature'),
+        ]
+        for klass, key in image_classes:
+            qs = klass.objects.filter(source_image__in=batch_images)
+            for image in qs.iterator():
+                setattr(image_map[image.source_image_id], key, image)
+
+        serializer = ImageGroupSerializer(image_map.values(), many=True)
+        return self.get_paginated_response(serializer.data)

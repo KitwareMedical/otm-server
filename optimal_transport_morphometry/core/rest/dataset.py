@@ -20,20 +20,12 @@ from rest_framework.viewsets import ModelViewSet
 from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
 from optimal_transport_morphometry.core.models import (
     Dataset,
-    FeatureImage,
     Image,
-    JacobianImage,
-    RegisteredImage,
-    SegmentedImage,
+    PreprocessingBatch,
+    UploadBatch,
 )
-from optimal_transport_morphometry.core.models.upload_batch import UploadBatch
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
-from optimal_transport_morphometry.core.rest.preprocessing import (
-    FeatureImageSerializer,
-    JacobianImageSerializer,
-    RegisteredImageSerializer,
-    SegmentedImageSerializer,
-)
+from optimal_transport_morphometry.core.rest.preprocessing import PreprocessingBatchSerializer
 from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
 from optimal_transport_morphometry.core.rest.upload_batch import UploadBatchSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
@@ -48,10 +40,10 @@ class DatasetSerializer(serializers.ModelSerializer):
             'name',
             'description',
             'public',
-            'preprocessing_status',
+            'current_preprocessing_batch',
             'analysis_status',
         ]
-        read_only_fields = ['id', 'preprocessing_status', 'analysis_status']
+        read_only_fields = ['id', 'analysis_status', 'current_preprocessing_batch']
 
     # Set default value
     public = serializers.BooleanField(default=False)
@@ -65,7 +57,7 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
             'name',
             'description',
             'public',
-            'preprocessing_status',
+            'current_preprocessing_batch',
             'analysis_status',
             # Extra
             'access',
@@ -83,25 +75,13 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
 
     uploads_active = serializers.BooleanField()
     image_count = serializers.IntegerField()
+    current_preprocessing_batch = PreprocessingBatchSerializer()
 
 
 class DatasetListQuerySerializer(serializers.Serializer):
     # Add fields for filtering
     name = serializers.CharField(required=False)
     access = serializers.ChoiceField(choices=['public', 'shared', 'owned'], required=False)
-
-
-class ImageGroupSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Image
-        new_fields = ['registered', 'jacobian', 'segmented', 'feature']
-        fields = ImageSerializer.Meta.fields + new_fields
-        read_only_fields = ImageSerializer.Meta.fields + new_fields
-
-    registered = RegisteredImageSerializer(allow_null=True)
-    jacobian = JacobianImageSerializer(allow_null=True)
-    segmented = SegmentedImageSerializer(allow_null=True)
-    feature = FeatureImageSerializer(allow_null=True)
 
 
 class CreateBatchSerializer(serializers.Serializer):
@@ -145,14 +125,16 @@ class DatasetPermissions(BasePermission):
 
 
 class DatasetViewSet(ModelViewSet):
-    queryset = Dataset.objects.select_related('owner').all()
+    queryset = Dataset.objects.select_related('owner', 'current_preprocessing_batch').all()
 
     permission_classes = [DatasetPermissions]
     serializer_class = DatasetSerializer
     pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
-        return Dataset.visible_datasets(self.request.user)
+        return Dataset.visible_datasets(self.request.user).select_related(
+            'current_preprocessing_batch'
+        )
 
     @swagger_auto_schema(
         operation_description='Retrieve a dataset by its ID.',
@@ -321,52 +303,34 @@ class DatasetViewSet(ModelViewSet):
         return Response(UserSerializer(instance=users, many=True).data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        operation_description='Retrieve the preprocessed images, as annotated onto each image'
-        ' entry for this dataset.',
-        query_serializer=LimitOffsetSerializer,
-    )
-    @action(detail=True, methods=['get'])
-    def preprocessed_images(self, request, pk):
-        dataset: Dataset = self.get_object()
-        dataset_images: List[Image] = self.paginate_queryset(
-            Image.objects.filter(dataset=dataset).order_by('name')
-        )
-
-        # Create map and start assigning processed images to each
-        # We do this so we can make ~4 queries, as opposed to O(n) queries
-        image_map = {im.id: im for im in dataset_images}
-        image_classes = [
-            (RegisteredImage, 'registered'),
-            (JacobianImage, 'jacobian'),
-            (SegmentedImage, 'segmented'),
-            (FeatureImage, 'feature'),
-        ]
-        for klass, key in image_classes:
-            qs = klass.objects.filter(source_image__in=dataset_images).distinct('source_image')
-            for image in qs.iterator():
-                setattr(image_map[image.source_image_id], key, image)
-
-        serializer = ImageGroupSerializer(image_map.values(), many=True)
-        return self.get_paginated_response(serializer.data)
-
-    @swagger_auto_schema(
         operation_description='Start preprocessing on a dataset.',
         request_body=no_body,
-        responses={200: PreprocessResponseSerializer()},
+        responses={200: PreprocessingBatchSerializer()},
     )
     @action(detail=True, methods=['POST'])
     def preprocess(self, request, pk: str):
         dataset: Dataset = self.get_object()
-        if dataset.preprocessing_status == Dataset.ProcessStatus.RUNNING:
+        if (
+            dataset.current_preprocessing_batch is not None
+            and dataset.current_preprocessing_batch.status
+            in [PreprocessingBatch.Status.PENDING, PreprocessingBatch.Status.RUNNING]
+        ):
             raise serializers.ValidationError('Preprocessing currently running.')
 
-        # Set status of preprocessing here, to avoid race conditions
-        dataset.preprocessing_status = Dataset.ProcessStatus.RUNNING
-        dataset.save(update_fields=['preprocessing_status'])
+        # Check against empty runs
+        if not dataset.images.count():
+            raise serializers.ValidationError('Cannot run preprocessing on empty dataset.')
+
+        # Create new preprocessing batch
+        batch = PreprocessingBatch.objects.create(dataset=dataset)
+
+        # Set current batch
+        dataset.current_preprocessing_batch = batch
+        dataset.save(update_fields=['current_preprocessing_batch'])
 
         # Dispatch task, return task id
-        task: AsyncResult = preprocess_images.delay(dataset.id)
-        return Response(PreprocessResponseSerializer({'task_id': task.id}).data)
+        preprocess_images.delay(batch.id)
+        return Response(PreprocessingBatchSerializer(batch).data)
 
     @swagger_auto_schema(
         operation_description='Run analysis on a dataset.',

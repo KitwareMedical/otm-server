@@ -7,31 +7,44 @@ from typing import List, TextIO
 
 from celery import shared_task
 from django.core.files import File
-from django.db import transaction
 
 from optimal_transport_morphometry.core import models
 
 
-@shared_task()
-def preprocess_images(dataset_id: int, replace: bool = False, downsample: float = 3.0):
+def handle_preprocess_failure(self, exc, task_id, args, kwargs, einfo):
+    batch_id = args[0]
+    batch: models.PreprocessingBatch = models.PreprocessingBatch.objects.select_related(
+        'dataset'
+    ).get(pk=batch_id)
+
+    # Set fields and save
+    batch.error_message += str(exc) + '\n\n' + str(einfo)
+    batch.status = models.PreprocessingBatch.Status.FAILED
+    batch.save(update_fields=['error_message', 'status'])
+
+
+@shared_task(on_failure=handle_preprocess_failure)
+def preprocess_images(batch_id: int, downsample: float = 3.0):
     # Import to avoid need for ants package in API
     import ants
     import numpy as np
 
-    atlas = models.Atlas.objects.filter(name='T1.nii').first()
-    atlas_csf = models.Atlas.objects.filter(name='csf.nii').first()
-    atlas_grey = models.Atlas.objects.filter(name='grey.nii').first()
-    atlas_white = models.Atlas.objects.filter(name='white.nii').first()
-    dataset: models.Dataset = models.Dataset.objects.get(pk=dataset_id)
+    # Fetch atlases, raising an error if some aren't found
+    atlas = models.Atlas.objects.get(name='T1.nii')
+    atlas_csf = models.Atlas.objects.get(name='csf.nii')
+    atlas_grey = models.Atlas.objects.get(name='grey.nii')
+    atlas_white = models.Atlas.objects.get(name='white.nii')
 
-    # Check that all atlases found
-    if None in [atlas, atlas_csf, atlas_grey, atlas_white]:
-        raise Exception('Not all atlases found')
+    # Fetch dataset
+    batch: models.PreprocessingBatch = models.PreprocessingBatch.objects.select_related(
+        'dataset'
+    ).get(pk=batch_id)
+    dataset: models.Dataset = batch.dataset
 
     # Ensure in running state
-    if dataset.preprocessing_status != models.Dataset.ProcessStatus.RUNNING:
-        dataset.preprocessing_status = models.Dataset.ProcessStatus.RUNNING
-        dataset.save(update_fields=['preprocessing_status'])
+    if batch.status != models.PreprocessingBatch.Status.RUNNING:
+        batch.status = models.PreprocessingBatch.Status.RUNNING
+        batch.save(update_fields=['status'])
 
     print('Downloading atlas files')
     with NamedTemporaryFile(suffix='atlas.nii') as tmp, atlas.blob.open() as blob:
@@ -63,10 +76,14 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
     mask_view[mask_view > 0] = 1
 
     for image in dataset.images.order_by('name').all():
-        if replace:
-            _delete_preprocessing_artifacts(image)
-        elif _already_preprocessed(image):
+        # Options that will be shared among each created model
+        common_model_args = {'source_image': image, 'preprocessing_batch': batch, 'atlas': atlas}
+
+        # Check if image already processed
+        if _already_preprocessed(image, batch_id):
             continue
+
+        # Read img
         with NamedTemporaryFile(suffix=image.name) as tmp, image.blob.open() as blob:
             for chunk in blob.chunks():
                 tmp.write(chunk)
@@ -83,14 +100,14 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
         )
         jac_img = jac_img.apply(np.abs)
 
-        reg_model = models.RegisteredImage(source_image=image, atlas=atlas)
+        reg_model = models.RegisteredImage(**common_model_args)
         reg_img = reg['warpedmovout']
         with NamedTemporaryFile(suffix='registered.nii.gz') as tmp:
             ants.image_write(reg_img, tmp.name)
             reg_model.blob = File(tmp, name='registered.nii.gz')
             reg_model.save()
 
-        jac_model = models.JacobianImage(source_image=image, atlas=atlas)
+        jac_model = models.JacobianImage(**common_model_args)
         with NamedTemporaryFile(suffix='jacobian.nii.gz') as tmp:
             ants.image_write(jac_img, tmp.name)
             jac_model.blob = File(tmp, name='jacobian.nii.gz')
@@ -100,7 +117,7 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
         seg = ants.prior_based_segmentation(reg_img, priors, mask)
         del reg_img
 
-        seg_model = models.SegmentedImage(source_image=image, atlas=atlas)
+        seg_model = models.SegmentedImage(**common_model_args)
         with NamedTemporaryFile(suffix='segmented.nii.gz') as tmp:
             ants.image_write(seg['segmentation'], tmp.name)
             seg_model.blob = File(tmp, name='segmented.nii.gz')
@@ -120,16 +137,15 @@ def preprocess_images(dataset_id: int, replace: bool = False, downsample: float 
             shape = np.round(np.asarray(feature_img.shape) / downsample)
             feature_img = ants.resample_image(feature_img, shape, True)
 
-        feature_model = models.FeatureImage(
-            source_image=image, atlas=atlas, downsample_factor=downsample
-        )
+        feature_model = models.FeatureImage(**common_model_args, downsample_factor=downsample)
         with NamedTemporaryFile(suffix='feature.nii.gz') as tmp:
             ants.image_write(feature_img, tmp.name)
             feature_model.blob = File(tmp, name='feature.nii.gz')
             feature_model.save()
 
-    dataset.preprocessing_status = models.Dataset.ProcessStatus.FINISHED
-    dataset.save()
+    # Update batch status
+    batch.status = models.PreprocessingBatch.Status.FINISHED
+    batch.save()
 
 
 @shared_task()
@@ -194,20 +210,9 @@ def run_utm(dataset_id: int):
         dataset.save(update_fields=['analysis_status'])
 
 
-@transaction.atomic
-def _delete_preprocessing_artifacts(image: models.Image) -> None:
-    for model in [
-        models.JacobianImage,
-        models.SegmentedImage,
-        models.RegisteredImage,
-        models.FeatureImage,
-    ]:
-        model.objects.filter(source_image=image).delete()  # type: ignore
-
-
-def _already_preprocessed(image: models.Image) -> bool:
+def _already_preprocessed(image: models.Image, batch_id: int) -> bool:
     return all(
-        model.objects.filter(source_image=image).count() > 0  # type: ignore
+        model.objects.filter(source_image=image, preprocessing_batch=batch_id).count() > 0
         for model in [
             models.JacobianImage,
             models.SegmentedImage,

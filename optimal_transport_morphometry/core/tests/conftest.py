@@ -8,6 +8,7 @@ from .factories import (
     ImageFactory,
     JacobianImageFactory,
     PendingUploadFactory,
+    PreprocessingBatchFactory,
     RegisteredImageFactory,
     SegmentedImageFactory,
     T1AtlasFactory,
@@ -33,6 +34,7 @@ register(FeatureImageFactory)
 register(ImageFactory)
 register(JacobianImageFactory)
 register(PendingUploadFactory)
+register(PreprocessingBatchFactory)
 register(RegisteredImageFactory)
 register(SegmentedImageFactory)
 register(T1AtlasFactory)
