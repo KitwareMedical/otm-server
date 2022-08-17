@@ -1,6 +1,6 @@
 import pytest
 
-from optimal_transport_morphometry.core.models.dataset import Dataset
+from optimal_transport_morphometry.core.models import Dataset
 
 
 @pytest.mark.django_db
@@ -12,11 +12,11 @@ def test_dispatch_preprocess(user, api_client, dataset_factory):
 
     # Assert resp
     assert r.status_code == 200
-    assert 'task_id' in r.json()
 
-    # Assert preprocessing status
-    dataset.refresh_from_db()
-    assert dataset.preprocessing_status == Dataset.ProcessStatus.RUNNING
+    # Get batch
+    batch_id = r.json()['id']
+    r = api_client.get(f'/api/v1/preprocessing_batches/{batch_id}')
+    assert r.status_code == 200
 
 
 @pytest.mark.django_db
@@ -30,10 +30,6 @@ def test_dispatch_preprocess_existing(user, api_client, dataset_factory):
     # Assert resp
     assert r.status_code == 400
     assert r.json() == ['Preprocessing currently running.']
-
-    # Assert preprocessing status
-    dataset.refresh_from_db()
-    assert dataset.preprocessing_status == Dataset.ProcessStatus.RUNNING
 
 
 @pytest.mark.django_db

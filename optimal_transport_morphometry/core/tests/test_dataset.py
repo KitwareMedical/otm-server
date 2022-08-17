@@ -20,7 +20,7 @@ def test_dataset_create(user, api_client):
         'name': 'test',
         'description': 'asd',
         'public': False,
-        'preprocessing_status': Dataset.ProcessStatus.PENDING,
+        'current_preprocessing_batch': None,
         'analysis_status': Dataset.ProcessStatus.PENDING,
     }
 

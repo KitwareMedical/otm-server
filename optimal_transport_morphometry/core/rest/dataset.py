@@ -18,15 +18,14 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
-from optimal_transport_morphometry.core.models import Dataset, Image
-from optimal_transport_morphometry.core.models.upload_batch import UploadBatch
-from optimal_transport_morphometry.core.rest.image import ImageSerializer
-from optimal_transport_morphometry.core.rest.preprocessing import (
-    FeatureImageSerializer,
-    JacobianImageSerializer,
-    RegisteredImageSerializer,
-    SegmentedImageSerializer,
+from optimal_transport_morphometry.core.models import (
+    Dataset,
+    Image,
+    PreprocessingBatch,
+    UploadBatch,
 )
+from optimal_transport_morphometry.core.rest.image import ImageSerializer
+from optimal_transport_morphometry.core.rest.preprocessing import PreprocessingBatchSerializer
 from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
 from optimal_transport_morphometry.core.rest.upload_batch import UploadBatchSerializer
 from optimal_transport_morphometry.core.rest.user import UserSerializer
@@ -125,7 +124,7 @@ class DatasetPermissions(BasePermission):
 
 
 class DatasetViewSet(ModelViewSet):
-    queryset = Dataset.objects.select_related('owner').all()
+    queryset = Dataset.objects.select_related('owner', 'current_preprocessing_batch').all()
 
     permission_classes = [DatasetPermissions]
     serializer_class = DatasetSerializer
@@ -303,21 +302,28 @@ class DatasetViewSet(ModelViewSet):
     @swagger_auto_schema(
         operation_description='Start preprocessing on a dataset.',
         request_body=no_body,
-        responses={200: PreprocessResponseSerializer()},
+        responses={200: PreprocessingBatchSerializer()},
     )
     @action(detail=True, methods=['POST'])
     def preprocess(self, request, pk: str):
         dataset: Dataset = self.get_object()
-        if dataset.preprocessing_status == Dataset.ProcessStatus.RUNNING:
+        if (
+            dataset.current_preprocessing_batch is not None
+            and dataset.current_preprocessing_batch.status
+            in [PreprocessingBatch.Status.PENDING, PreprocessingBatch.Status.RUNNING]
+        ):
             raise serializers.ValidationError('Preprocessing currently running.')
 
-        # Set status of preprocessing here, to avoid race conditions
-        dataset.preprocessing_status = Dataset.ProcessStatus.RUNNING
-        dataset.save(update_fields=['preprocessing_status'])
+        # Create new preprocessing batch
+        batch = PreprocessingBatch.objects.create(dataset=dataset)
+
+        # Set current batch
+        dataset.current_preprocessing_batch = batch
+        dataset.save(update_fields=['current_preprocessing_batch'])
 
         # Dispatch task, return task id
-        task: AsyncResult = preprocess_images.delay(dataset.id)
-        return Response(PreprocessResponseSerializer({'task_id': task.id}).data)
+        preprocess_images.delay(batch.id)
+        return Response(PreprocessingBatchSerializer(batch).data)
 
     @swagger_auto_schema(
         operation_description='Run analysis on a dataset.',
