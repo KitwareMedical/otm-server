@@ -14,10 +14,8 @@ router.register(r'datasets', rest.DatasetViewSet)
 router.register(r'images', rest.ImageViewSet)
 
 # Preprocessed images
-# router.register(r'preprocessed/feature_images', rest.FeatureImageViewSet)
-# router.register(r'preprocessed/jacobian_images', rest.JacobianImageViewSet)
-# router.register(r'preprocessed/registered_images', rest.RegisteredImageViewSet)
-# router.register(r'preprocessed/segmented_images', rest.SegmentedImageViewSet)
+# TODO: Add preprocessing batch viewset here
+router.register(r'preprocessing_batches', rest.PreprocessingBatchViewSet)
 
 # Upload
 router.register(r'upload/pending', rest.PendingUploadViewSet)

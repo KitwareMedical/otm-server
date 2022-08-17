@@ -8,6 +8,7 @@ from optimal_transport_morphometry.core.models import (
     Image,
     JacobianImage,
     PendingUpload,
+    PreprocessingBatch,
     RegisteredImage,
     SegmentedImage,
     UploadBatch,
@@ -65,38 +66,40 @@ class ImageFactory(factory.django.DjangoModelFactory):
     dataset = factory.SubFactory(DatasetFactory)
 
 
-class FeatureImageFactory(factory.django.DjangoModelFactory):
+class PreprocessingBatchFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PreprocessingBatch
+
+    dataset = factory.SubFactory(DatasetFactory)
+
+
+class AbstractPreprocessedImageFactory(factory.django.DjangoModelFactory):
+    blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
+    source_image = factory.SubFactory(ImageFactory)
+    atlas = factory.SubFactory(T1AtlasFactory)
+    preprocessing_batch = factory.SubFactory(PreprocessingBatchFactory)
+
+    class Meta:
+        abstract = True
+
+
+class FeatureImageFactory(AbstractPreprocessedImageFactory):
     class Meta:
         model = FeatureImage
 
-    blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
-    source_image = factory.SubFactory(ImageFactory)
-    atlas = factory.SubFactory(T1AtlasFactory)
     downsample_factor = 3.0
 
 
-class JacobianImageFactory(factory.django.DjangoModelFactory):
+class JacobianImageFactory(AbstractPreprocessedImageFactory):
     class Meta:
         model = JacobianImage
 
-    blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
-    source_image = factory.SubFactory(ImageFactory)
-    atlas = factory.SubFactory(T1AtlasFactory)
 
-
-class RegisteredImageFactory(factory.django.DjangoModelFactory):
+class RegisteredImageFactory(AbstractPreprocessedImageFactory):
     class Meta:
         model = RegisteredImage
 
-    blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
-    source_image = factory.SubFactory(ImageFactory)
-    atlas = factory.SubFactory(T1AtlasFactory)
 
-
-class SegmentedImageFactory(factory.django.DjangoModelFactory):
+class SegmentedImageFactory(AbstractPreprocessedImageFactory):
     class Meta:
         model = SegmentedImage
-
-    blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
-    source_image = factory.SubFactory(ImageFactory)
-    atlas = factory.SubFactory(T1AtlasFactory)
