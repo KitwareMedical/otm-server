@@ -75,6 +75,7 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
 
     uploads_active = serializers.BooleanField()
     image_count = serializers.IntegerField()
+    current_preprocessing_batch = PreprocessingBatchSerializer()
 
 
 class DatasetListQuerySerializer(serializers.Serializer):
@@ -131,7 +132,9 @@ class DatasetViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
-        return Dataset.visible_datasets(self.request.user)
+        return Dataset.visible_datasets(self.request.user).select_related(
+            'current_preprocessing_batch'
+        )
 
     @swagger_auto_schema(
         operation_description='Retrieve a dataset by its ID.',

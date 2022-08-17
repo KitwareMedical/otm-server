@@ -71,12 +71,14 @@ class PreprocessingBatchDetailSerializer(serializers.ModelSerializer):
             'dataset',
             'status',
             'error_message',
-            'progress',
             'current_image_name',
+            'progress',
+            'expected_image_count',
         ]
 
-    progress = serializers.FloatField()
     current_image_name = serializers.CharField(required=False, default=None)
+    progress = serializers.FloatField()
+    expected_image_count = serializers.IntegerField()
 
 
 class ImageGroupSerializer(serializers.ModelSerializer):
@@ -107,6 +109,8 @@ class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
     def annotated_queryset(self):
         qs = self.get_queryset()
         return qs.annotate(
+            # Must use 4.0 instead of 4 here so it is cast as float
+            expected_image_count=(models.Count('dataset__images', distinct=True) * 4.0),
             progress=(
                 models.Count('core_featureimage', distinct=True)
                 + models.Count('core_jacobianimage', distinct=True)
@@ -114,8 +118,7 @@ class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
                 + models.Count('core_segmentedimage', distinct=True)
             )
             # TODO: Replace with static field value when added
-            # Must use 4.0 instead of 4 here so it is cast as float
-            / (models.Count('dataset__images', distinct=True) * 4.0)
+            / models.F('expected_image_count'),
         )
 
     def retrieve(self, request, pk: str):
@@ -123,7 +126,7 @@ class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
         batch: PreprocessingBatch = get_object_or_404(queryset, pk=pk)
 
         # Add image currently being worked on
-        batch.current_image_name = batch.current_image().name
+        batch.current_image_name = getattr(batch.current_image(), 'name', None)
 
         self.check_object_permissions(self.request, batch)
         serializer = PreprocessingBatchDetailSerializer(batch)
