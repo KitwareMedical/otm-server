@@ -11,7 +11,19 @@ from django.core.files import File
 from optimal_transport_morphometry.core import models
 
 
-@shared_task()
+def handle_preprocess_failure(self, exc, task_id, args, kwargs, einfo):
+    batch_id = args[0]
+    batch: models.PreprocessingBatch = models.PreprocessingBatch.objects.select_related(
+        'dataset'
+    ).get(pk=batch_id)
+
+    # Set fields and save
+    batch.error_message += str(exc) + '\n\n' + str(einfo)
+    batch.status = models.PreprocessingBatch.Status.FAILED
+    batch.save(update_fields=['error_message', 'status'])
+
+
+@shared_task(on_failure=handle_preprocess_failure)
 def preprocess_images(batch_id: int, downsample: float = 3.0):
     # Import to avoid need for ants package in API
     import ants
