@@ -32,7 +32,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python',
     ],
-    python_requires='>=3.9',
+    python_requires='>=3.8',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
