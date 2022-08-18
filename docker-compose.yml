@@ -3,7 +3,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./dev/celery.Dockerfile
     command: [
       "bash", "-c",
       "/usr/bin/shiny-server /etc/shiny-server/shiny-server.conf &
