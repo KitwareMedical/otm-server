@@ -168,7 +168,7 @@ def run_utm(dataset_id: int):
             meta.setdefault('name', image.name)
             variables.append(meta)
 
-            feature_image = image.feature_images.first()
+            feature_image = image.core_featureimages.first()
             filename = f'{tmpdir}/{meta["name"]}'
             with feature_image.blob.open() as blob, open(filename, 'wb') as fd:
                 for chunk in blob.chunks():
