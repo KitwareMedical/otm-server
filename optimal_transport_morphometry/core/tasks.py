@@ -163,6 +163,8 @@ def run_utm(dataset_id: int):
     dataset.analysis_status = models.Dataset.ProcessStatus.RUNNING
     dataset.save(update_fields=['analysis_status'])
 
+    # TODO: Since analysis isn't being visualized by R shiny, output all
+    # data into a temporary folder, to be removed after the task completes
     with TemporaryDirectory() as tmpdir:
         variables = []
         for image in dataset.images.all():
