@@ -218,7 +218,7 @@ def run_utm(dataset_id: int):
 
         # Zip result and save
         zip_filename = shutil.make_archive(
-            tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir=output_folder
+            tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
         )
         with open(zip_filename, 'rb') as f:
             dataset.analysis_result = SimpleUploadedFile(
