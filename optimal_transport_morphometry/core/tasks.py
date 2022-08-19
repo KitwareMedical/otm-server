@@ -1,5 +1,6 @@
 import csv
 import os
+import pathlib
 import shutil
 import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -166,8 +167,16 @@ def run_utm(dataset_id: int):
         for image in dataset.images.all():
             meta = image.metadata
             meta.setdefault('name', image.name)
+
+            # Ensure file has .nii.gz extension
+            # Ants will produce a segmentation fault if it tries to read a
+            # compressed image with an uncompressed file extension, and visa versa
+            meta['name'] = pathlib.Path(meta['name']).with_suffix('.nii.gz')
+
+            # Add meta to variables
             variables.append(meta)
 
+            # Write feature image to file
             feature_image = image.core_featureimages.first()
             filename = f'{tmpdir}/{meta["name"]}'
             with feature_image.blob.open() as blob, open(filename, 'wb') as fd:
