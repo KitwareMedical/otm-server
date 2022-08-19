@@ -18,6 +18,29 @@ def populate_compressed_atlases(apps, schema_editor):
             )
 
 
+def migrate_atlases(apps, schema_editor):
+    Atlas = apps.get_model('core', 'Atlas')
+    FeatureImage = apps.get_model('core', 'FeatureImage')
+    JacobianImage = apps.get_model('core', 'JacobianImage')
+    RegisteredImage = apps.get_model('core', 'RegisteredImage')
+    SegmentedImage = apps.get_model('core', 'SegmentedImage')
+
+    # Run for each preprocessed image class
+    classes = [FeatureImage, JacobianImage, RegisteredImage, SegmentedImage]
+    for cls in classes:
+        objs = cls.objects.select_related('atlas').filter(atlas__name__endswith='.nii')
+
+        # Obj is a preprocessed image that's atlas is uncompressed
+        for obj in objs:
+            # Find compressed atlas if possible
+            matching = Atlas.objects.filter(name=f'{obj.atlas.name}.gz').first()
+
+            # Set to uncompressed
+            if matching is not None:
+                obj.atlas = matching
+                obj.save()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -26,4 +49,5 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(populate_compressed_atlases, migrations.RunPython.noop),
+        migrations.RunPython(migrate_atlases, migrations.RunPython.noop),
     ]
