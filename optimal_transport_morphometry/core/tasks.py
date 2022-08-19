@@ -1,12 +1,15 @@
 import csv
 import os
+import pathlib
 import shutil
 import subprocess
+import tempfile
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import List, TextIO
 
 from celery import shared_task
 from django.core.files import File
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from optimal_transport_morphometry.core import models
 
@@ -161,14 +164,24 @@ def run_utm(dataset_id: int):
     dataset.analysis_status = models.Dataset.ProcessStatus.RUNNING
     dataset.save(update_fields=['analysis_status'])
 
+    # TODO: Since analysis isn't being visualized by R shiny, output all
+    # data into a temporary folder, to be removed after the task completes
     with TemporaryDirectory() as tmpdir:
         variables = []
         for image in dataset.images.all():
             meta = image.metadata
             meta.setdefault('name', image.name)
+
+            # Ensure file has .nii.gz extension
+            # Ants will produce a segmentation fault if it tries to read a
+            # compressed image with an uncompressed file extension, and visa versa
+            meta['name'] = pathlib.Path(meta['name']).with_suffix('.nii.gz')
+
+            # Add meta to variables
             variables.append(meta)
 
-            feature_image = image.feature_images.first()
+            # Write feature image to file
+            feature_image = image.core_featureimages.first()
             filename = f'{tmpdir}/{meta["name"]}'
             with feature_image.blob.open() as blob, open(filename, 'wb') as fd:
                 for chunk in blob.chunks():
@@ -201,13 +214,28 @@ def run_utm(dataset_id: int):
                 output_folder,
             ]
         )
-        if result.returncode == 0:
-            dataset.analysis_status = models.Dataset.ProcessStatus.FINISHED
-        else:
-            dataset.analysis_status = models.Dataset.ProcessStatus.FAILED
 
-        # Save
+        # Set analysis status and return if failed
+        dataset.analysis_status = (
+            models.Dataset.ProcessStatus.FINISHED
+            if result.returncode == 0
+            else models.Dataset.ProcessStatus.FAILED
+        )
         dataset.save(update_fields=['analysis_status'])
+        if dataset.analysis_status == models.Dataset.ProcessStatus.FAILED:
+            return
+
+        # Zip result and save
+        zip_filename = shutil.make_archive(
+            tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
+        )
+        with open(zip_filename, 'rb') as f:
+            dataset.analysis_result = SimpleUploadedFile(
+                name=f'dataset_{dataset_id}_utm_analysis.zip', content=f.read()
+            )
+
+        # Save resulting file
+        dataset.save(update_fields=['analysis_result'])
 
 
 def _already_preprocessed(image: models.Image, batch_id: int) -> bool:

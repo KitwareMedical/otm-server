@@ -1,4 +1,3 @@
-from django.db import models
 from django.shortcuts import get_object_or_404
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import mixins, serializers
@@ -106,24 +105,19 @@ class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
             dataset__in=Dataset.visible_datasets(self.request.user)
         )
 
-    def annotated_queryset(self):
-        qs = self.get_queryset()
-        return qs.annotate(
-            # Must use 4.0 instead of 4 here so it is cast as float
-            expected_image_count=(models.Count('dataset__images', distinct=True) * 4.0),
-            progress=(
-                models.Count('core_featureimage', distinct=True)
-                + models.Count('core_jacobianimage', distinct=True)
-                + models.Count('core_registeredimage', distinct=True)
-                + models.Count('core_segmentedimage', distinct=True)
-            )
-            # TODO: Replace with static field value when added
-            / models.F('expected_image_count'),
-        )
-
     def retrieve(self, request, pk: str):
-        queryset = self.filter_queryset(self.annotated_queryset())
+        queryset = self.filter_queryset(self.get_queryset())
         batch: PreprocessingBatch = get_object_or_404(queryset, pk=pk)
+
+        # Compute progress by counting all preprocessed images,
+        # compared against the total expected image count
+        batch.expected_image_count = batch.dataset.images.count() * 4.0
+        batch.progress = (
+            FeatureImage.objects.filter(preprocessing_batch=batch).count()
+            + JacobianImage.objects.filter(preprocessing_batch=batch).count()
+            + RegisteredImage.objects.filter(preprocessing_batch=batch).count()
+            + SegmentedImage.objects.filter(preprocessing_batch=batch).count()
+        ) / batch.expected_image_count
 
         # Add image currently being worked on
         batch.current_image_name = getattr(batch.current_image(), 'name', None)
