@@ -29,8 +29,8 @@ class T1AtlasFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Atlas
 
-    name = 'T1.nii'
-    blob = factory.django.FileField(data=b'fakeimagebytes', filename='T1.nii')
+    name = 'T1.nii.gz'
+    blob = factory.django.FileField(data=b'fakeimagebytes', filename='T1.nii.gz')
 
 
 class DatasetFactory(factory.django.DjangoModelFactory):

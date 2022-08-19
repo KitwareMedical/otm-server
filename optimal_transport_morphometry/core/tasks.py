@@ -33,10 +33,10 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
     import numpy as np
 
     # Fetch atlases, raising an error if some aren't found
-    atlas = models.Atlas.objects.get(name='T1.nii')
-    atlas_csf = models.Atlas.objects.get(name='csf.nii')
-    atlas_grey = models.Atlas.objects.get(name='grey.nii')
-    atlas_white = models.Atlas.objects.get(name='white.nii')
+    atlas = models.Atlas.objects.get(name='T1.nii.gz')
+    atlas_csf = models.Atlas.objects.get(name='csf.nii.gz')
+    atlas_grey = models.Atlas.objects.get(name='grey.nii.gz')
+    atlas_white = models.Atlas.objects.get(name='white.nii.gz')
 
     # Fetch dataset
     batch: models.PreprocessingBatch = models.PreprocessingBatch.objects.select_related(
@@ -50,22 +50,22 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
         batch.save(update_fields=['status'])
 
     print('Downloading atlas files')
-    with NamedTemporaryFile(suffix='atlas.nii') as tmp, atlas.blob.open() as blob:
+    with NamedTemporaryFile(suffix='atlas.nii.gz') as tmp, atlas.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
         atlas_img = ants.image_read(tmp.name)
 
-    with NamedTemporaryFile(suffix='atlas_csf.nii') as tmp, atlas_csf.blob.open() as blob:
+    with NamedTemporaryFile(suffix='atlas_csf.nii.gz') as tmp, atlas_csf.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
         atlas_csf_img = ants.image_read(tmp.name)
 
-    with NamedTemporaryFile(suffix='atlas_grey.nii') as tmp, atlas_grey.blob.open() as blob:
+    with NamedTemporaryFile(suffix='atlas_grey.nii.gz') as tmp, atlas_grey.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
         atlas_grey_img = ants.image_read(tmp.name)
 
-    with NamedTemporaryFile(suffix='atlas_white.nii') as tmp, atlas_white.blob.open() as blob:
+    with NamedTemporaryFile(suffix='atlas_white.nii.gz') as tmp, atlas_white.blob.open() as blob:
         for chunk in blob.chunks():
             tmp.write(chunk)
         atlas_white_img = ants.image_read(tmp.name)
