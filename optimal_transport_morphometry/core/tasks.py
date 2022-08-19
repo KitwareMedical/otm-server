@@ -231,7 +231,7 @@ def run_utm(dataset_id: int):
         )
         with open(zip_filename, 'rb') as f:
             dataset.analysis_result = SimpleUploadedFile(
-                name=f'dataset_{dataset_id}_utm_analysis', content=f.read()
+                name=f'dataset_{dataset_id}_utm_analysis.zip', content=f.read()
             )
 
         # Save resulting file
