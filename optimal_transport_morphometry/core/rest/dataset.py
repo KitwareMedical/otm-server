@@ -42,8 +42,14 @@ class DatasetSerializer(serializers.ModelSerializer):
             'public',
             'current_preprocessing_batch',
             'analysis_status',
+            'analysis_result',
         ]
-        read_only_fields = ['id', 'analysis_status', 'current_preprocessing_batch']
+        read_only_fields = [
+            'id',
+            'analysis_status',
+            'analysis_status',
+            'current_preprocessing_batch',
+        ]
 
     # Set default value
     public = serializers.BooleanField(default=False)
@@ -59,6 +65,7 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
             'public',
             'current_preprocessing_batch',
             'analysis_status',
+            'analysis_result',
             # Extra
             'access',
             'uploads_active',
