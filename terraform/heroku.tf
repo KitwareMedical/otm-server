@@ -4,7 +4,7 @@ data "heroku_team" "heroku" {
 
 module "django" {
   source  = "girder/girder4/heroku"
-  version = "0.11.0"
+  version = "0.12.0"
 
   heroku_team_name = data.heroku_team.heroku.name
   project_slug     = "kitware-otm"
