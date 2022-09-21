@@ -23,7 +23,8 @@ packages = c(
   "shinyBS",
   "yaml",
   "raster",
-  "DT"
+  "DT",
+  "RNifti"
 )
 install.packages(pkgs = packages)
 
