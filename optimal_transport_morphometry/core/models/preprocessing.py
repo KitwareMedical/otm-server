@@ -16,11 +16,17 @@ class PreprocessingBatch(TimeStampedModel):
         FINISHED = 'Finished'
         FAILED = 'Failed'
 
-    status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
+    # Dataset that contains images to preprocess
     dataset = models.ForeignKey(
         Dataset, on_delete=models.CASCADE, related_name='preprocessing_batches'
     )
+
+    # Status / errors
+    status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     error_message = models.TextField(blank=True, default='')
+
+    # The atlas used
+    atlas = models.ForeignKey(Atlas, on_delete=models.PROTECT, related_name='preprocessing_batches')
 
     # The total number of preprocessed images that should be expected in this batch
     # expected_total = models.PositiveIntegerField()
@@ -71,9 +77,6 @@ class AbstractPreprocessedImage(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name='%(app_label)s_%(class)ss',
         db_index=True,
-    )
-    atlas = models.ForeignKey(
-        Atlas, on_delete=models.PROTECT, related_name='%(app_label)s_%(class)ss'
     )
 
     # The preprocessing batch this preprocessed image belongs to
