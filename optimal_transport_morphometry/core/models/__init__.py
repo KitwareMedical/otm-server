@@ -1,3 +1,4 @@
+from .analysis import AnalysisResult
 from .atlas import Atlas
 from .dataset import Dataset
 from .image import Image
@@ -13,6 +14,7 @@ from .preprocessing import (
 from .upload_batch import UploadBatch
 
 __all__ = [
+    'AnalysisResult',
     'Atlas',
     'Dataset',
     'FeatureImage',

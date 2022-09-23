@@ -1,3 +1,4 @@
+from .analysis import AnalysisResultAdmin
 from .atlas import AtlasAdmin
 from .dataset import DatasetAdmin
 from .image import ImageAdmin
@@ -10,6 +11,7 @@ from .preprocess import (
 from .upload import PendingUpload, UploadBatch
 
 __all__ = [
+    'AnalysisResultAdmin',
     'AtlasAdmin',
     'DatasetAdmin',
     'ImageAdmin',

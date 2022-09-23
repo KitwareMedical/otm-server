@@ -12,8 +12,6 @@ class DatasetAdmin(GuardedModelAdmin):
         'owner',
         'public',
         'current_preprocessing_batch',
-        'analysis_status',
-        'analysis_result',
     ]
     list_display_links = ['id', 'name']
     list_filter = ['name']
@@ -27,6 +25,4 @@ class DatasetAdmin(GuardedModelAdmin):
         'owner',
         'public',
         'current_preprocessing_batch',
-        'analysis_status',
-        'analysis_result',
     ]

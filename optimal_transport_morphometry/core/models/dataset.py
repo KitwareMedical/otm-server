@@ -4,7 +4,6 @@ from django.contrib.auth.models import User
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
-from s3_file_field import S3FileField
 
 
 class Dataset(TimeStampedModel, models.Model):
@@ -25,9 +24,8 @@ class Dataset(TimeStampedModel, models.Model):
     )
 
     # Analysis
-    analysis_result = S3FileField(null=True, blank=True)
-    analysis_status = models.CharField(
-        max_length=32, choices=ProcessStatus.choices, default=ProcessStatus.PENDING
+    current_analysis_result = models.OneToOneField(
+        'AnalysisResult', on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
     )
 
     class Meta:
