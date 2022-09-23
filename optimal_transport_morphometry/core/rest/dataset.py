@@ -1,7 +1,6 @@
 import codecs
 from typing import List
 
-from celery.result import AsyncResult
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef
@@ -19,6 +18,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
 from optimal_transport_morphometry.core.models import (
+    AnalysisResult,
     Dataset,
     Image,
     PreprocessingBatch,
@@ -140,7 +140,8 @@ class DatasetViewSet(ModelViewSet):
 
     def get_queryset(self):
         return Dataset.visible_datasets(self.request.user).select_related(
-            'current_preprocessing_batch'
+            'current_preprocessing_batch',
+            'current_analysis_result',
         )
 
     @swagger_auto_schema(
@@ -347,16 +348,30 @@ class DatasetViewSet(ModelViewSet):
     @action(detail=True, methods=['POST'])
     def utm_analysis(self, request, pk: str):
         dataset: Dataset = self.get_object()
-        if dataset.analysis_status == Dataset.ProcessStatus.RUNNING:
+
+        # Ensure preprocessing was previously run
+        if dataset.current_preprocessing_batch is None:
+            raise serializers.ValidationError('Preprocessing must be run first.')
+
+        # Ensure analysis isn't already running
+        if (
+            dataset.current_analysis_result
+            and dataset.current_analysis_result.status == AnalysisResult.Status.RUNNING
+        ):
             raise serializers.ValidationError('Analysis currently running.')
 
-        # Set status of preprocessing here, to avoid race conditions
-        dataset.analysis_status = Dataset.ProcessStatus.RUNNING
-        dataset.save(update_fields=['analysis_status'])
+        # Create analysis result
+        analysis: AnalysisResult = AnalysisResult.objects.create(
+            preprocessing_batch=dataset.current_preprocessing_batch
+        )
 
-        # Dispatch task, return task id
-        task: AsyncResult = run_utm.delay(dataset.id)
-        return Response(PreprocessResponseSerializer({'task_id': task.id}).data)
+        # Set current analysis result
+        dataset.current_analysis_result = analysis
+        dataset.save()
+
+        # Dispatch task
+        run_utm.delay(analysis.id)
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
 
     @swagger_auto_schema(
         operation_description='Retrieve all dataset images.',

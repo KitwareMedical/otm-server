@@ -18,7 +18,7 @@ class AnalysisResult(TimeStampedModel):
     )
 
     # Resulting data
-    zip_file = S3FileField(null=True, blank=True)
+    zip_file = S3FileField(null=True, blank=True, default=None)
     data = models.JSONField(default=dict)
 
     # Status/Result

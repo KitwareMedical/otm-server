@@ -152,22 +152,30 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
 
 
 @shared_task()
-def run_utm(dataset_id: int):
+def run_utm(batch_id: int):
     # using default_configuration.yml in UTM repo for now
     # TODO: load config.yml file as well
+    analysis_batch: models.AnalysisResult = models.AnalysisResult.select_related(
+        'preprocessing_batch__dataset'
+    ).objects.get(id=batch_id)
+    preprocessing_batch: models.PreprocessingBatch = analysis_batch.preprocessing_batch
+    dataset: models.Dataset = preprocessing_batch.dataset
 
-    dataset: models.Dataset = models.Dataset.objects.get(pk=dataset_id)
-    output_folder = f'/srv/shiny-server/utm_{dataset_id}'  # shiny-server directory
+    # Directory names
+    output_folder = f'/srv/shiny-server/utm_{preprocessing_batch.dataset_id}_{batch_id}'
     utm_folder = '/opt/UTM'
 
     # Set status before starting
-    dataset.analysis_status = models.Dataset.ProcessStatus.RUNNING
-    dataset.save(update_fields=['analysis_status'])
+    analysis_batch = models.AnalysisResult.status.RUNNING
+    analysis_batch.save()
 
     # TODO: Since analysis isn't being visualized by R shiny, output all
     # data into a temporary folder, to be removed after the task completes
     with TemporaryDirectory() as tmpdir:
         variables = []
+
+        # TODO: There's no need to iterate through all dataset images
+        # Instead, we should iterate over the preprocessing batch feature images
         for image in dataset.images.all():
             meta = image.metadata
             meta.setdefault('name', image.name)
@@ -216,13 +224,13 @@ def run_utm(dataset_id: int):
         )
 
         # Set analysis status and return if failed
-        dataset.analysis_status = (
-            models.Dataset.ProcessStatus.FINISHED
+        analysis_batch.status = (
+            models.AnalysisResult.Status.FINISHED
             if result.returncode == 0
-            else models.Dataset.ProcessStatus.FAILED
+            else models.AnalysisResult.Status.FAILED
         )
-        dataset.save(update_fields=['analysis_status'])
-        if dataset.analysis_status == models.Dataset.ProcessStatus.FAILED:
+        analysis_batch.save(update_fields=['status'])
+        if analysis_batch.status == models.AnalysisResult.Status.FAILED:
             return
 
         # Zip result and save
@@ -230,12 +238,13 @@ def run_utm(dataset_id: int):
             tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
         )
         with open(zip_filename, 'rb') as f:
-            dataset.analysis_result = SimpleUploadedFile(
-                name=f'dataset_{dataset_id}_utm_analysis.zip', content=f.read()
+            analysis_batch.zip_file = SimpleUploadedFile(
+                name=f'dataset_{dataset.id}_utm_analysis_{analysis_batch.id}.zip',
+                content=f.read(),
             )
 
         # Save resulting file
-        dataset.save(update_fields=['analysis_result'])
+        dataset.save()
 
 
 def _already_preprocessed(image: models.Image, batch_id: int) -> bool:
