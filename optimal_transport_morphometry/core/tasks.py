@@ -1,10 +1,9 @@
 import csv
-import os
 import pathlib
 import shutil
 import subprocess
 import tempfile
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory, mkdtemp
 from typing import List, TextIO
 
 from celery import shared_task
@@ -12,6 +11,8 @@ from django.core.files import File
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from optimal_transport_morphometry.core import models
+
+UTM_FOLDER = '/opt/UTM'
 
 
 def handle_preprocess_failure(self, exc, task_id, args, kwargs, einfo):
@@ -152,31 +153,36 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
 
 
 @shared_task()
-def run_utm(batch_id: int):
+def run_utm(analysis_id: int):
     # using default_configuration.yml in UTM repo for now
     # TODO: load config.yml file as well
-    analysis_batch: models.AnalysisResult = models.AnalysisResult.select_related(
+    analysis_result: models.AnalysisResult = models.AnalysisResult.select_related(
         'preprocessing_batch__dataset'
-    ).objects.get(id=batch_id)
-    preprocessing_batch: models.PreprocessingBatch = analysis_batch.preprocessing_batch
+    ).objects.get(id=analysis_id)
+    preprocessing_batch: models.PreprocessingBatch = analysis_result.preprocessing_batch
     dataset: models.Dataset = preprocessing_batch.dataset
 
-    # Directory names
-    output_folder = f'/srv/shiny-server/utm_{preprocessing_batch.dataset_id}_{batch_id}'
-    utm_folder = '/opt/UTM'
-
     # Set status before starting
-    analysis_batch = models.AnalysisResult.status.RUNNING
-    analysis_batch.save()
+    analysis_result = models.AnalysisResult.status.RUNNING
+    analysis_result.save()
 
     # TODO: Since analysis isn't being visualized by R shiny, output all
     # data into a temporary folder, to be removed after the task completes
     with TemporaryDirectory() as tmpdir:
-        variables = []
+        # Since these folders are contained within tmpdir,
+        # they will be automatically deleted when tmpdir is deleted
+        input_folder = mkdtemp(dir=tmpdir)
+        output_folder = mkdtemp(dir=tmpdir)
 
-        # TODO: There's no need to iterate through all dataset images
-        # Instead, we should iterate over the preprocessing batch feature images
-        for image in dataset.images.all():
+        # Get all feature images in this preprocessing batch
+        feature_image_qs = models.FeatureImage.objects.filter(
+            preprocessing_batch=preprocessing_batch
+        ).select_related('source_image')
+
+        # Iterate over every feature image
+        variables = []
+        for feature_image in feature_image_qs:
+            image = feature_image.source_image
             meta = image.metadata
             meta.setdefault('name', image.name)
 
@@ -189,34 +195,31 @@ def run_utm(batch_id: int):
             variables.append(meta)
 
             # Write feature image to file
-            feature_image = image.core_featureimages.first()
-            filename = f'{tmpdir}/{meta["name"]}'
+            filename = f'{input_folder}/{meta["name"]}'
             with feature_image.blob.open() as blob, open(filename, 'wb') as fd:
                 for chunk in blob.chunks():
                     fd.write(chunk)
 
-        variables_filename = f'{tmpdir}/variables.csv'
+        # Write variables to a csv file
+        variables_filename = f'{input_folder}/variables.csv'
         headers = variables[0].keys()
         with open(variables_filename, 'w') as csvfile:
             _write_csv(csvfile, headers, variables)
 
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
-
         # copy necessary R shiny files
-        shutil.copyfile(f'{utm_folder}/Scripts/Shiny/app.R', f'{output_folder}/app.R')
+        shutil.copyfile(f'{UTM_FOLDER}/Scripts/Shiny/app.R', f'{output_folder}/app.R')
         shutil.copyfile(
-            f'{utm_folder}/Scripts/Shiny/shiny-help.md', f'{output_folder}/shiny-help.md'
+            f'{UTM_FOLDER}/Scripts/Shiny/shiny-help.md', f'{output_folder}/shiny-help.md'
         )
         shutil.copyfile(
-            f'{utm_folder}/Scripts/ShinyVtkScripts/render.js', f'{output_folder}/render.js'
+            f'{UTM_FOLDER}/Scripts/ShinyVtkScripts/render.js', f'{output_folder}/render.js'
         )
 
         result = subprocess.run(
             [
                 'Rscript',
                 '/opt/UTM/Scripts/run.utm.barycenter.R',
-                tmpdir,
+                input_folder,
                 variables_filename,
                 '--working.folder',
                 output_folder,
@@ -224,13 +227,13 @@ def run_utm(batch_id: int):
         )
 
         # Set analysis status and return if failed
-        analysis_batch.status = (
+        analysis_result.status = (
             models.AnalysisResult.Status.FINISHED
             if result.returncode == 0
             else models.AnalysisResult.Status.FAILED
         )
-        analysis_batch.save(update_fields=['status'])
-        if analysis_batch.status == models.AnalysisResult.Status.FAILED:
+        analysis_result.save(update_fields=['status'])
+        if analysis_result.status == models.AnalysisResult.Status.FAILED:
             return
 
         # Zip result and save
@@ -238,8 +241,8 @@ def run_utm(batch_id: int):
             tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
         )
         with open(zip_filename, 'rb') as f:
-            analysis_batch.zip_file = SimpleUploadedFile(
-                name=f'dataset_{dataset.id}_utm_analysis_{analysis_batch.id}.zip',
+            analysis_result.zip_file = SimpleUploadedFile(
+                name=f'dataset_{dataset.id}_utm_analysis_{analysis_result.id}.zip',
                 content=f.read(),
             )
 
