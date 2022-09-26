@@ -23,7 +23,6 @@ PREPROCESSED_IMAGE_FIELDS = [
     'created',
     'modified',
     'blob',
-    'atlas',
     'source_image',
     'preprocessing_batch',
 ]

@@ -24,3 +24,10 @@ class AnalysisResult(TimeStampedModel):
     # Status/Result
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     error_message = models.TextField(blank=True, default='')
+
+    @property
+    def running_statuses(self):
+        return [self.Status.PENDING, self.Status.RUNNING]
+
+    def currently_running(self):
+        return self.status in self.running_statuses

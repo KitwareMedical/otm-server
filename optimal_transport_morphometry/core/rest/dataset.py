@@ -19,6 +19,7 @@ from rest_framework.viewsets import ModelViewSet
 from optimal_transport_morphometry.core.batch_parser import load_batch_from_csv
 from optimal_transport_morphometry.core.models import (
     AnalysisResult,
+    Atlas,
     Dataset,
     Image,
     PreprocessingBatch,
@@ -41,14 +42,12 @@ class DatasetSerializer(serializers.ModelSerializer):
             'description',
             'public',
             'current_preprocessing_batch',
-            'analysis_status',
-            'analysis_result',
+            'current_analysis_result',
         ]
         read_only_fields = [
             'id',
-            'analysis_status',
-            'analysis_status',
             'current_preprocessing_batch',
+            'current_analysis_result',
         ]
 
     # Set default value
@@ -64,8 +63,7 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
             'description',
             'public',
             'current_preprocessing_batch',
-            'analysis_status',
-            'analysis_result',
+            'current_analysis_result',
             # Extra
             'access',
             'uploads_active',
@@ -330,7 +328,7 @@ class DatasetViewSet(ModelViewSet):
             raise serializers.ValidationError('Cannot run preprocessing on empty dataset.')
 
         # Create new preprocessing batch
-        batch = PreprocessingBatch.objects.create(dataset=dataset)
+        batch = PreprocessingBatch.objects.create(dataset=dataset, atlas=Atlas.default_atlas())
 
         # Set current batch
         dataset.current_preprocessing_batch = batch
@@ -354,10 +352,7 @@ class DatasetViewSet(ModelViewSet):
             raise serializers.ValidationError('Preprocessing must be run first.')
 
         # Ensure analysis isn't already running
-        if (
-            dataset.current_analysis_result
-            and dataset.current_analysis_result.status == AnalysisResult.Status.RUNNING
-        ):
+        if dataset.current_analysis_result and dataset.current_analysis_result.currently_running():
             raise serializers.ValidationError('Analysis currently running.')
 
         # Create analysis result

@@ -12,12 +12,6 @@ class Dataset(TimeStampedModel, models.Model):
     public = models.BooleanField(default=False)
     owner = models.ForeignKey(User, related_name='datasets_owned', on_delete=models.CASCADE)
 
-    class ProcessStatus(models.TextChoices):
-        PENDING = 'Pending'
-        RUNNING = 'Running'
-        FINISHED = 'Finished'
-        FAILED = 'Failed'
-
     # Preprocessing
     current_preprocessing_batch = models.OneToOneField(
         'PreprocessingBatch', on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
