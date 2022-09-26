@@ -152,7 +152,17 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
     batch.save()
 
 
-@shared_task()
+def handle_analysis_failure(self, exc, task_id, args, kwargs, einfo):
+    analysis_id = args[0]
+    analysis_result: models.AnalysisResult = models.AnalysisResult.objects.get(id=analysis_id)
+
+    # Set fields and save
+    analysis_result.error_message += str(exc) + '\n\n' + str(einfo)
+    analysis_result.status = models.PreprocessingBatch.Status.FAILED
+    analysis_result.save(update_fields=['error_message', 'status'])
+
+
+@shared_task(on_failure=handle_analysis_failure)
 def run_utm(analysis_id: int):
     # using default_configuration.yml in UTM repo for now
     # TODO: load config.yml file as well
@@ -163,7 +173,7 @@ def run_utm(analysis_id: int):
     dataset: models.Dataset = preprocessing_batch.dataset
 
     # Set status before starting
-    analysis_result = models.AnalysisResult.status.RUNNING
+    analysis_result.status = models.AnalysisResult.Status.RUNNING
     analysis_result.save()
 
     # TODO: Since analysis isn't being visualized by R shiny, output all
@@ -232,21 +242,20 @@ def run_utm(analysis_id: int):
             if result.returncode == 0
             else models.AnalysisResult.Status.FAILED
         )
-        analysis_result.save(update_fields=['status'])
-        if analysis_result.status == models.AnalysisResult.Status.FAILED:
-            return
 
-        # Zip result and save
-        zip_filename = shutil.make_archive(
-            tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
-        )
-        with open(zip_filename, 'rb') as f:
-            analysis_result.zip_file = SimpleUploadedFile(
-                name=f'dataset_{dataset.id}_utm_analysis_{analysis_result.id}.zip',
-                content=f.read(),
+        # Create and upload zip file
+        if analysis_result.status == models.AnalysisResult.Status.FINISHED:
+            zip_filename = shutil.make_archive(
+                tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
             )
+            with open(zip_filename, 'rb') as f:
+                analysis_result.zip_file = SimpleUploadedFile(
+                    name=f'dataset_{dataset.id}_utm_analysis_{analysis_result.id}.zip',
+                    content=f.read(),
+                )
 
-        # Save resulting file
+        # Save
+        analysis_result.save()
         dataset.save()
 
 
