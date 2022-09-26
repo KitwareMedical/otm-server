@@ -25,6 +25,7 @@ from optimal_transport_morphometry.core.models import (
     PreprocessingBatch,
     UploadBatch,
 )
+from optimal_transport_morphometry.core.rest.analysis import AnalysisResultSerializer
 from optimal_transport_morphometry.core.rest.image import ImageSerializer
 from optimal_transport_morphometry.core.rest.preprocessing import PreprocessingBatchSerializer
 from optimal_transport_morphometry.core.rest.serializers import LimitOffsetSerializer
@@ -81,6 +82,7 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
     uploads_active = serializers.BooleanField()
     image_count = serializers.IntegerField()
     current_preprocessing_batch = PreprocessingBatchSerializer()
+    current_analysis_result = AnalysisResultSerializer()
 
 
 class DatasetListQuerySerializer(serializers.Serializer):
