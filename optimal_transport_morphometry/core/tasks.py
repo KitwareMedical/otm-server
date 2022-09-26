@@ -81,7 +81,7 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
 
     for image in dataset.images.order_by('name').all():
         # Options that will be shared among each created model
-        common_model_args = {'source_image': image, 'preprocessing_batch': batch, 'atlas': atlas}
+        common_model_args = {'source_image': image, 'preprocessing_batch': batch}
 
         # Check if image already processed
         if _already_preprocessed(image, batch_id):
@@ -156,9 +156,9 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
 def run_utm(analysis_id: int):
     # using default_configuration.yml in UTM repo for now
     # TODO: load config.yml file as well
-    analysis_result: models.AnalysisResult = models.AnalysisResult.select_related(
+    analysis_result: models.AnalysisResult = models.AnalysisResult.objects.select_related(
         'preprocessing_batch__dataset'
-    ).objects.get(id=analysis_id)
+    ).get(id=analysis_id)
     preprocessing_batch: models.PreprocessingBatch = analysis_result.preprocessing_batch
     dataset: models.Dataset = preprocessing_batch.dataset
 
