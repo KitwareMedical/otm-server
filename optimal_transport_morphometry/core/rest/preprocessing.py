@@ -23,7 +23,6 @@ PREPROCESSED_IMAGE_FIELDS = [
     'created',
     'modified',
     'blob',
-    'atlas',
     'source_image',
     'preprocessing_batch',
 ]
@@ -57,7 +56,7 @@ class SegmentedImageSerializer(serializers.ModelSerializer):
 class PreprocessingBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = PreprocessingBatch
-        fields = ['id', 'created', 'modified', 'dataset', 'status', 'error_message']
+        fields = ['id', 'created', 'modified', 'dataset', 'atlas', 'status', 'error_message']
 
 
 class PreprocessingBatchDetailSerializer(serializers.ModelSerializer):
@@ -68,6 +67,7 @@ class PreprocessingBatchDetailSerializer(serializers.ModelSerializer):
             'created',
             'modified',
             'dataset',
+            'atlas',
             'status',
             'error_message',
             'current_image_name',

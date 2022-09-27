@@ -1,10 +1,9 @@
 import csv
-import os
 import pathlib
 import shutil
 import subprocess
 import tempfile
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory, mkdtemp
 from typing import List, TextIO
 
 from celery import shared_task
@@ -12,6 +11,8 @@ from django.core.files import File
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from optimal_transport_morphometry.core import models
+
+UTM_FOLDER = '/opt/UTM'
 
 
 def handle_preprocess_failure(self, exc, task_id, args, kwargs, einfo):
@@ -80,7 +81,7 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
 
     for image in dataset.images.order_by('name').all():
         # Options that will be shared among each created model
-        common_model_args = {'source_image': image, 'preprocessing_batch': batch, 'atlas': atlas}
+        common_model_args = {'source_image': image, 'preprocessing_batch': batch}
 
         # Check if image already processed
         if _already_preprocessed(image, batch_id):
@@ -151,24 +152,47 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
     batch.save()
 
 
-@shared_task()
-def run_utm(dataset_id: int):
+def handle_analysis_failure(self, exc, task_id, args, kwargs, einfo):
+    analysis_id = args[0]
+    analysis_result: models.AnalysisResult = models.AnalysisResult.objects.get(id=analysis_id)
+
+    # Set fields and save
+    analysis_result.error_message += str(exc) + '\n\n' + str(einfo)
+    analysis_result.status = models.PreprocessingBatch.Status.FAILED
+    analysis_result.save(update_fields=['error_message', 'status'])
+
+
+@shared_task(on_failure=handle_analysis_failure)
+def run_utm(analysis_id: int):
     # using default_configuration.yml in UTM repo for now
     # TODO: load config.yml file as well
-
-    dataset: models.Dataset = models.Dataset.objects.get(pk=dataset_id)
-    output_folder = f'/srv/shiny-server/utm_{dataset_id}'  # shiny-server directory
-    utm_folder = '/opt/UTM'
+    analysis_result: models.AnalysisResult = models.AnalysisResult.objects.select_related(
+        'preprocessing_batch__dataset'
+    ).get(id=analysis_id)
+    preprocessing_batch: models.PreprocessingBatch = analysis_result.preprocessing_batch
+    dataset: models.Dataset = preprocessing_batch.dataset
 
     # Set status before starting
-    dataset.analysis_status = models.Dataset.ProcessStatus.RUNNING
-    dataset.save(update_fields=['analysis_status'])
+    analysis_result.status = models.AnalysisResult.Status.RUNNING
+    analysis_result.save()
 
     # TODO: Since analysis isn't being visualized by R shiny, output all
     # data into a temporary folder, to be removed after the task completes
     with TemporaryDirectory() as tmpdir:
+        # Since these folders are contained within tmpdir,
+        # they will be automatically deleted when tmpdir is deleted
+        input_folder = mkdtemp(dir=tmpdir)
+        output_folder = mkdtemp(dir=tmpdir)
+
+        # Get all feature images in this preprocessing batch
+        feature_image_qs = models.FeatureImage.objects.filter(
+            preprocessing_batch=preprocessing_batch
+        ).select_related('source_image')
+
+        # Iterate over every feature image
         variables = []
-        for image in dataset.images.all():
+        for feature_image in feature_image_qs:
+            image = feature_image.source_image
             meta = image.metadata
             meta.setdefault('name', image.name)
 
@@ -181,34 +205,31 @@ def run_utm(dataset_id: int):
             variables.append(meta)
 
             # Write feature image to file
-            feature_image = image.core_featureimages.first()
-            filename = f'{tmpdir}/{meta["name"]}'
+            filename = f'{input_folder}/{meta["name"]}'
             with feature_image.blob.open() as blob, open(filename, 'wb') as fd:
                 for chunk in blob.chunks():
                     fd.write(chunk)
 
-        variables_filename = f'{tmpdir}/variables.csv'
+        # Write variables to a csv file
+        variables_filename = f'{input_folder}/variables.csv'
         headers = variables[0].keys()
         with open(variables_filename, 'w') as csvfile:
             _write_csv(csvfile, headers, variables)
 
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
-
         # copy necessary R shiny files
-        shutil.copyfile(f'{utm_folder}/Scripts/Shiny/app.R', f'{output_folder}/app.R')
+        shutil.copyfile(f'{UTM_FOLDER}/Scripts/Shiny/app.R', f'{output_folder}/app.R')
         shutil.copyfile(
-            f'{utm_folder}/Scripts/Shiny/shiny-help.md', f'{output_folder}/shiny-help.md'
+            f'{UTM_FOLDER}/Scripts/Shiny/shiny-help.md', f'{output_folder}/shiny-help.md'
         )
         shutil.copyfile(
-            f'{utm_folder}/Scripts/ShinyVtkScripts/render.js', f'{output_folder}/render.js'
+            f'{UTM_FOLDER}/Scripts/ShinyVtkScripts/render.js', f'{output_folder}/render.js'
         )
 
         result = subprocess.run(
             [
                 'Rscript',
                 '/opt/UTM/Scripts/run.utm.barycenter.R',
-                tmpdir,
+                input_folder,
                 variables_filename,
                 '--working.folder',
                 output_folder,
@@ -216,26 +237,26 @@ def run_utm(dataset_id: int):
         )
 
         # Set analysis status and return if failed
-        dataset.analysis_status = (
-            models.Dataset.ProcessStatus.FINISHED
+        analysis_result.status = (
+            models.AnalysisResult.Status.FINISHED
             if result.returncode == 0
-            else models.Dataset.ProcessStatus.FAILED
+            else models.AnalysisResult.Status.FAILED
         )
-        dataset.save(update_fields=['analysis_status'])
-        if dataset.analysis_status == models.Dataset.ProcessStatus.FAILED:
-            return
 
-        # Zip result and save
-        zip_filename = shutil.make_archive(
-            tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
-        )
-        with open(zip_filename, 'rb') as f:
-            dataset.analysis_result = SimpleUploadedFile(
-                name=f'dataset_{dataset_id}_utm_analysis.zip', content=f.read()
+        # Create and upload zip file
+        if analysis_result.status == models.AnalysisResult.Status.FINISHED:
+            zip_filename = shutil.make_archive(
+                tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
             )
+            with open(zip_filename, 'rb') as f:
+                analysis_result.zip_file = SimpleUploadedFile(
+                    name=f'dataset_{dataset.id}_utm_analysis_{analysis_result.id}.zip',
+                    content=f.read(),
+                )
 
-        # Save resulting file
-        dataset.save(update_fields=['analysis_result'])
+        # Save
+        analysis_result.save()
+        dataset.save()
 
 
 def _already_preprocessed(image: models.Image, batch_id: int) -> bool:

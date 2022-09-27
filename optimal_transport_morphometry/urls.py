@@ -13,9 +13,9 @@ router.register(r'atlases', rest.AtlasViewSet)
 router.register(r'datasets', rest.DatasetViewSet)
 router.register(r'images', rest.ImageViewSet)
 
-# Preprocessed images
-# TODO: Add preprocessing batch viewset here
+# Preprocessing and Analysis
 router.register(r'preprocessing_batches', rest.PreprocessingBatchViewSet)
+router.register(r'analysis', rest.AnalysisResultViewSet)
 
 # Upload
 router.register(r'upload/pending', rest.PendingUploadViewSet)

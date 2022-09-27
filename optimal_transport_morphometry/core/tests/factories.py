@@ -71,12 +71,12 @@ class PreprocessingBatchFactory(factory.django.DjangoModelFactory):
         model = PreprocessingBatch
 
     dataset = factory.SubFactory(DatasetFactory)
+    atlas = factory.SubFactory(T1AtlasFactory)
 
 
 class AbstractPreprocessedImageFactory(factory.django.DjangoModelFactory):
     blob = factory.django.FileField(data=b'fakeimagebytes', filename='fake.png')
     source_image = factory.SubFactory(ImageFactory)
-    atlas = factory.SubFactory(T1AtlasFactory)
     preprocessing_batch = factory.SubFactory(PreprocessingBatchFactory)
 
     class Meta:

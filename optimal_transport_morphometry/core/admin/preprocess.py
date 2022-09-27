@@ -11,12 +11,12 @@ from optimal_transport_morphometry.core.models import (
 
 @admin.register(PreprocessingBatch)
 class PreprocessingBatchAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created', 'status', 'dataset', 'error_message']
+    list_display = ['id', 'atlas', 'created', 'status', 'dataset', 'error_message']
     list_display_links = ['id']
 
 
 class CommonAdmin(admin.ModelAdmin):
-    list_display = ['id', 'atlas', 'blob', 'source_image', 'preprocessing_batch']
+    list_display = ['id', 'blob', 'source_image', 'preprocessing_batch']
     list_display_links = ['id']
 
 
