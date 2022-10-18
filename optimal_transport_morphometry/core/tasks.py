@@ -11,6 +11,7 @@ from django.core.files import File
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from optimal_transport_morphometry.core import models
+from optimal_transport_morphometry.core.storage import upload_local_file
 
 UTM_FOLDER = '/opt/UTM'
 
@@ -152,6 +153,44 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
     batch.save()
 
 
+def upload_analysis_images(output_dir: str):
+    features = ['allocation', 'transport', 'vbm']
+    data = {}
+
+    def handle_path(path: pathlib.Path):
+        # Ignore files at this level
+        if path.is_file():
+            return
+
+        path_data = {}
+        for feature in features:
+            # If any of these features don't exist, return
+            feature_path = path / feature
+            if not feature_path.exists():
+                return
+
+            # If either image aren't found, return
+            correlation = feature_path / 'correlation.nii.gz'
+            pvalue = feature_path / 'pvalue.nii.gz'
+            if not (correlation.exists() and pvalue.exists()):
+                return
+
+            # Perform upload
+            path_data[feature] = {
+                'correlation': upload_local_file(str(correlation)),
+                'pvalue': upload_local_file(str(pvalue)),
+            }
+
+        # Loop finished, all feature images uploaded, add to data dict
+        data[path.name] = path_data
+
+    image_dir = pathlib.Path(output_dir) / 'Analysis' / 'Images'
+    for variable_path in image_dir.iterdir():
+        handle_path(variable_path)
+
+    return data
+
+
 def handle_analysis_failure(self, exc, task_id, args, kwargs, einfo):
     analysis_id = args[0]
     analysis_result: models.AnalysisResult = models.AnalysisResult.objects.get(id=analysis_id)
@@ -245,6 +284,7 @@ def run_utm(analysis_id: int):
 
         # Create and upload zip file
         if analysis_result.status == models.AnalysisResult.Status.FINISHED:
+            # Create zip
             zip_filename = shutil.make_archive(
                 tempfile.mktemp(), 'zip', root_dir=output_folder, base_dir='./'
             )
@@ -253,6 +293,9 @@ def run_utm(analysis_id: int):
                     name=f'dataset_{dataset.id}_utm_analysis_{analysis_result.id}.zip',
                     content=f.read(),
                 )
+
+            # Upload images to S3
+            analysis_result.data = upload_analysis_images(output_folder)
 
         # Save
         analysis_result.save()

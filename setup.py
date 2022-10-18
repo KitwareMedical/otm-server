@@ -36,6 +36,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        'boto3[s3]',
         'celery',
         'django~=3.2',
         'django-admin-display',
@@ -56,6 +57,7 @@ setup(
     ],
     extras_require={
         'dev': [
+            'boto3-stubs[s3]',
             'django-composed-configuration[dev]',
             'django-debug-toolbar',
             'django-s3-file-field[minio]',
