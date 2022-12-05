@@ -112,12 +112,14 @@ class PreprocessingBatchViewSet(mixins.RetrieveModelMixin, GenericViewSet):
         # Compute progress by counting all preprocessed images,
         # compared against the total expected image count
         batch.expected_image_count = batch.dataset.images.count() * 4.0
-        batch.progress = (
-            FeatureImage.objects.filter(preprocessing_batch=batch).count()
-            + JacobianImage.objects.filter(preprocessing_batch=batch).count()
-            + RegisteredImage.objects.filter(preprocessing_batch=batch).count()
-            + SegmentedImage.objects.filter(preprocessing_batch=batch).count()
-        ) / batch.expected_image_count
+        batch.progress = 0
+        if batch.expected_image_count > 0:
+            batch.progress = (
+                FeatureImage.objects.filter(preprocessing_batch=batch).count()
+                + JacobianImage.objects.filter(preprocessing_batch=batch).count()
+                + RegisteredImage.objects.filter(preprocessing_batch=batch).count()
+                + SegmentedImage.objects.filter(preprocessing_batch=batch).count()
+            ) / batch.expected_image_count
 
         # Add image currently being worked on
         batch.current_image_name = getattr(batch.current_image(), 'name', None)
