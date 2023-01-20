@@ -31,7 +31,7 @@ def command(zip_filename: click.Path, email: str, dataset_name: str) -> None:
     batch, _ = PreprocessingBatch.objects.get_or_create(
         dataset=dataset,
         status=PreprocessingBatch.Status.FINISHED,
-        atlas=Atlas.objects.get(name="T1.nii.gz"),
+        atlas=Atlas.objects.get(name='T1.nii.gz'),
     )
 
     # Create analysis
