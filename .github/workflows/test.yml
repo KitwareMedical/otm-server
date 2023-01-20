@@ -5,7 +5,8 @@ on:
     branches:
       - master
   schedule:
-    - cron: "0 0 * * *"
+    # Run once a week at Midnight, Sunday
+    - cron: "0 0 * * 1"
 
 jobs:
   test:
