@@ -25,8 +25,8 @@ except ImportError:
 
 def get_boto_client(config: Optional[botocore.client.Config] = None) -> 'S3Client':
     """Return an s3 client from the current storage."""
-    storage = get_storage_class()
-    if issubclass(storage, MinioStorage):
+    storage_class = get_storage_class()
+    if issubclass(storage_class, MinioStorage):
         return boto3.client(
             's3',
             endpoint_url=f'http://{settings.MINIO_STORAGE_ENDPOINT}',
@@ -36,7 +36,8 @@ def get_boto_client(config: Optional[botocore.client.Config] = None) -> 'S3Clien
             config=config,
         )
 
-    if issubclass(storage, S3Boto3Storage):
+    if issubclass(storage_class, S3Boto3Storage):
+        storage = storage_class()
         return storage.connection.meta.client
 
     raise Exception('Unsupported Storage')
