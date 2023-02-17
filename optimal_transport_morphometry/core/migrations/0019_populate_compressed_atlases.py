@@ -42,7 +42,6 @@ def migrate_atlases(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('core', '0018_dataset_analysis_result'),
     ]

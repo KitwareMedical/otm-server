@@ -50,7 +50,6 @@ def ensure_preprocessing_batch(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('core', '0016_auto_20220812_1756'),
     ]

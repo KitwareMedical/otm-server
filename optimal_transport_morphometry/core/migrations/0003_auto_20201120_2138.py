@@ -6,7 +6,6 @@ import optimal_transport_morphometry.core.models.metadata
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('core', '0002_initial_models'),
     ]

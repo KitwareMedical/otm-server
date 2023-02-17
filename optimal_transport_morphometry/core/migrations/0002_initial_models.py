@@ -9,7 +9,6 @@ import optimal_transport_morphometry.core.models.image
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
