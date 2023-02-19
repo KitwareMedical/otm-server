@@ -1,5 +1,6 @@
 import pathlib
 from typing import TYPE_CHECKING, Optional
+from urllib.parse import urlparse
 
 import boto3
 import botocore
@@ -53,12 +54,23 @@ def get_bucket_name():
     raise Exception('Unsupported Storage')
 
 
-def upload_local_file(filepath: str):
-    client = get_boto_client(
-        config=botocore.client.Config(
-            signature_version=botocore.UNSIGNED,
-        )
+def resign_s3_url(s3_url: str):
+    client = get_boto_client()
+
+    # Parse bucket name and object key
+    parsed = urlparse(s3_url)
+    bucket_name = get_bucket_name()
+    object_key = parsed.path.lstrip('/')
+
+    # Return newly signed URL
+    return client.generate_presigned_url(
+        ClientMethod='get_object',
+        Params={'Bucket': bucket_name, 'Key': object_key},
     )
+
+
+def upload_local_file(filepath: str):
+    client = get_boto_client()
 
     # Upload file
     path = pathlib.Path(filepath)
@@ -66,9 +78,8 @@ def upload_local_file(filepath: str):
     object_key = S3FileField.uuid_prefix_filename('', path.name)
     client.upload_file(Filename=str(path), Bucket=bucket_name, Key=object_key)
 
-    # Returned URL is unsigned due to config used above
-    url = client.generate_presigned_url(
+    # Returned a URL
+    return client.generate_presigned_url(
         ClientMethod='get_object',
         Params={'Bucket': bucket_name, 'Key': object_key},
     )
-    return url
