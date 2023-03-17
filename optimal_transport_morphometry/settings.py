@@ -45,6 +45,9 @@ class OptimalTransportMorphometryMixin(ConfigMixin):
             }
         )
 
+        # Allow redirect to /logout endpoint to logout
+        configuration.ACCOUNT_LOGOUT_ON_GET = True
+
 
 class DevelopmentConfiguration(OptimalTransportMorphometryMixin, DevelopmentBaseConfiguration):
     pass
