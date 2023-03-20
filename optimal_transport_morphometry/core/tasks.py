@@ -14,6 +14,7 @@ from optimal_transport_morphometry.core import models
 from optimal_transport_morphometry.core.storage import upload_local_file
 
 UTM_FOLDER = '/opt/UTM'
+ATLAS_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / 'OTM' / 'atlases'
 
 
 def handle_preprocess_failure(self, exc, task_id, args, kwargs, einfo):
@@ -28,12 +29,142 @@ def handle_preprocess_failure(self, exc, task_id, args, kwargs, einfo):
     batch.save(update_fields=['error_message', 'status'])
 
 
+def atlas_filepath(atlas: models.Atlas):
+    return ATLAS_CACHE_DIR / pathlib.Path(atlas.name)
+
+
+def download_atlas(atlas: models.Atlas):
+    atlas_path = atlas_filepath(atlas)
+    if atlas_path.exists() and atlas_path.stat().st_size > 0:
+        return
+
+    # Write remote file to disk
+    with open(atlas_path, 'wb') as atlas_file, atlas.blob.open() as blob:
+        for chunk in blob.chunks():
+            atlas_file.write(chunk)
+
+
+def batch_finished(batch: models.PreprocessingBatch) -> bool:
+    expected_image_count = batch.source_images().count() * 4
+    current_image_count = sum(
+        [
+            model.objects.filter(preprocessing_batch=batch.id).count()
+            for model in [
+                models.JacobianImage,
+                models.SegmentedImage,
+                models.RegisteredImage,
+                models.FeatureImage,
+            ]
+        ]
+    )
+
+    # Return false if all images aren't present yet
+    if current_image_count < expected_image_count:
+        return False
+
+    return True
+
+
 @shared_task(on_failure=handle_preprocess_failure)
-def preprocess_images(batch_id: int, downsample: float = 3.0):
-    # Import to avoid need for ants package in API
+def preprocess_image(batch_id: int, image_id: int, downsample: float):
     import ants
     import numpy as np
 
+    # Fetch relevant models
+    image = models.Image.objects.get(id=image_id)
+    atlas = models.Atlas.objects.get(name='T1.nii.gz')
+    atlas_csf = models.Atlas.objects.get(name='csf.nii.gz')
+    atlas_grey = models.Atlas.objects.get(name='grey.nii.gz')
+    atlas_white = models.Atlas.objects.get(name='white.nii.gz')
+    batch = models.PreprocessingBatch.objects.get(pk=batch_id)
+
+    # Read cached atlases
+    atlas_img = ants.image_read(str(atlas_filepath(atlas)))
+    atlas_csf_img = ants.image_read(str(atlas_filepath(atlas_csf)))
+    atlas_grey_img = ants.image_read(str(atlas_filepath(atlas_grey)))
+    atlas_white_img = ants.image_read(str(atlas_filepath(atlas_white)))
+
+    # Create mask
+    priors = [atlas_csf_img, atlas_grey_img, atlas_white_img]
+    mask = priors[0].copy()
+    mask_view = mask.view()
+    for i in range(1, len(priors)):
+        mask_view[priors[i].numpy() > 0] = 1
+    mask_view[mask_view > 0] = 1
+
+    # For creating preprocessed images
+    common_model_args = {'source_image': image, 'preprocessing_batch': batch}
+
+    # Read img
+    with NamedTemporaryFile(suffix=image.name) as tmp, image.blob.open() as blob:
+        for chunk in blob.chunks():
+            tmp.write(chunk)
+        input_img = ants.image_read(tmp.name)
+
+    print(f'Running N4 bias correction: {image.name}')
+    im_n4 = ants.n4_bias_field_correction(input_img)
+    del input_img
+    print(f'Running registration: {image.name}')
+    reg = ants.registration(atlas_img, im_n4)
+    del im_n4
+    jac_img = ants.create_jacobian_determinant_image(
+        atlas_img, reg['fwdtransforms'][0], False, True
+    )
+    jac_img = jac_img.apply(np.abs)
+
+    reg_model = models.RegisteredImage(**common_model_args)
+    reg_img = reg['warpedmovout']
+    with NamedTemporaryFile(suffix='registered.nii.gz') as tmp:
+        ants.image_write(reg_img, tmp.name)
+        reg_model.blob = File(tmp, name='registered.nii.gz')
+        reg_model.save()
+
+    jac_model = models.JacobianImage(**common_model_args)
+    with NamedTemporaryFile(suffix='jacobian.nii.gz') as tmp:
+        ants.image_write(jac_img, tmp.name)
+        jac_model.blob = File(tmp, name='jacobian.nii.gz')
+        jac_model.save()
+
+    print(f'Running segmentation: {image.name}')
+    seg = ants.prior_based_segmentation(reg_img, priors, mask)
+    del reg_img
+
+    seg_model = models.SegmentedImage(**common_model_args)
+    with NamedTemporaryFile(suffix='segmented.nii.gz') as tmp:
+        ants.image_write(seg['segmentation'], tmp.name)
+        seg_model.blob = File(tmp, name='segmented.nii.gz')
+        seg_model.save()
+
+    print(f'Creating feature image: {image.name}')
+    seg_img_view = seg['segmentation'].view()
+    feature_img = seg['segmentation'].copy()
+    feature_img_view = feature_img.view()
+    feature_img_view.fill(0)
+    feature_img_view[seg_img_view == 2] = 1  # 2 is grey matter label, 3 is white matter label
+
+    intensity_img_view = jac_img.view()
+    feature_img_view *= intensity_img_view
+
+    if downsample > 1:
+        shape = np.round(np.asarray(feature_img.shape) / downsample)
+        feature_img = ants.resample_image(feature_img, shape, True)
+
+    feature_model = models.FeatureImage(**common_model_args, downsample_factor=downsample)
+    with NamedTemporaryFile(suffix='feature.nii.gz') as tmp:
+        ants.image_write(feature_img, tmp.name)
+        feature_model.blob = File(tmp, name='feature.nii.gz')
+        feature_model.save()
+
+    # Set status if applicable
+    batch.refresh_from_db()
+    no_failures = batch.status == models.PreprocessingBatch.Status.RUNNING
+    if batch_finished(batch) and no_failures:
+        batch.status = models.PreprocessingBatch.Status.FINISHED
+        batch.save()
+
+
+@shared_task(on_failure=handle_preprocess_failure)
+def preprocess_images(batch_id: int, downsample: float = 3.0):
     # Fetch atlases, raising an error if some aren't found
     atlas = models.Atlas.objects.get(name='T1.nii.gz')
     atlas_csf = models.Atlas.objects.get(name='csf.nii.gz')
@@ -51,106 +182,19 @@ def preprocess_images(batch_id: int, downsample: float = 3.0):
         batch.status = models.PreprocessingBatch.Status.RUNNING
         batch.save(update_fields=['status'])
 
+    # Ensure cached atlas dir exists
+    atlases_dir = pathlib.Path(tempfile.gettempdir()) / 'OTM' / 'atlases'
+    atlases_dir.mkdir(parents=True, exist_ok=True)
+
     print('Downloading atlas files')
-    with NamedTemporaryFile(suffix='atlas.nii.gz') as tmp, atlas.blob.open() as blob:
-        for chunk in blob.chunks():
-            tmp.write(chunk)
-        atlas_img = ants.image_read(tmp.name)
+    download_atlas(atlas)
+    download_atlas(atlas_csf)
+    download_atlas(atlas_grey)
+    download_atlas(atlas_white)
 
-    with NamedTemporaryFile(suffix='atlas_csf.nii.gz') as tmp, atlas_csf.blob.open() as blob:
-        for chunk in blob.chunks():
-            tmp.write(chunk)
-        atlas_csf_img = ants.image_read(tmp.name)
-
-    with NamedTemporaryFile(suffix='atlas_grey.nii.gz') as tmp, atlas_grey.blob.open() as blob:
-        for chunk in blob.chunks():
-            tmp.write(chunk)
-        atlas_grey_img = ants.image_read(tmp.name)
-
-    with NamedTemporaryFile(suffix='atlas_white.nii.gz') as tmp, atlas_white.blob.open() as blob:
-        for chunk in blob.chunks():
-            tmp.write(chunk)
-        atlas_white_img = ants.image_read(tmp.name)
-
-    print('Creating mask')
-    priors = [atlas_csf_img, atlas_grey_img, atlas_white_img]
-    mask = priors[0].copy()
-    mask_view = mask.view()
-    for i in range(1, len(priors)):
-        mask_view[priors[i].numpy() > 0] = 1
-    mask_view[mask_view > 0] = 1
-
+    # Kick off individual tasks
     for image in dataset.images.order_by('name').all():
-        # Options that will be shared among each created model
-        common_model_args = {'source_image': image, 'preprocessing_batch': batch}
-
-        # Check if image already processed
-        if _already_preprocessed(image, batch_id):
-            continue
-
-        # Read img
-        with NamedTemporaryFile(suffix=image.name) as tmp, image.blob.open() as blob:
-            for chunk in blob.chunks():
-                tmp.write(chunk)
-            input_img = ants.image_read(tmp.name)
-
-        print(f'Running N4 bias correction: {image.name}')
-        im_n4 = ants.n4_bias_field_correction(input_img)
-        del input_img
-        print(f'Running registration: {image.name}')
-        reg = ants.registration(atlas_img, im_n4)
-        del im_n4
-        jac_img = ants.create_jacobian_determinant_image(
-            atlas_img, reg['fwdtransforms'][0], False, True
-        )
-        jac_img = jac_img.apply(np.abs)
-
-        reg_model = models.RegisteredImage(**common_model_args)
-        reg_img = reg['warpedmovout']
-        with NamedTemporaryFile(suffix='registered.nii.gz') as tmp:
-            ants.image_write(reg_img, tmp.name)
-            reg_model.blob = File(tmp, name='registered.nii.gz')
-            reg_model.save()
-
-        jac_model = models.JacobianImage(**common_model_args)
-        with NamedTemporaryFile(suffix='jacobian.nii.gz') as tmp:
-            ants.image_write(jac_img, tmp.name)
-            jac_model.blob = File(tmp, name='jacobian.nii.gz')
-            jac_model.save()
-
-        print(f'Running segmentation: {image.name}')
-        seg = ants.prior_based_segmentation(reg_img, priors, mask)
-        del reg_img
-
-        seg_model = models.SegmentedImage(**common_model_args)
-        with NamedTemporaryFile(suffix='segmented.nii.gz') as tmp:
-            ants.image_write(seg['segmentation'], tmp.name)
-            seg_model.blob = File(tmp, name='segmented.nii.gz')
-            seg_model.save()
-
-        print(f'Creating feature image: {image.name}')
-        seg_img_view = seg['segmentation'].view()
-        feature_img = seg['segmentation'].copy()
-        feature_img_view = feature_img.view()
-        feature_img_view.fill(0)
-        feature_img_view[seg_img_view == 2] = 1  # 2 is grey matter label, 3 is white matter label
-
-        intensity_img_view = jac_img.view()
-        feature_img_view *= intensity_img_view
-
-        if downsample > 1:
-            shape = np.round(np.asarray(feature_img.shape) / downsample)
-            feature_img = ants.resample_image(feature_img, shape, True)
-
-        feature_model = models.FeatureImage(**common_model_args, downsample_factor=downsample)
-        with NamedTemporaryFile(suffix='feature.nii.gz') as tmp:
-            ants.image_write(feature_img, tmp.name)
-            feature_model.blob = File(tmp, name='feature.nii.gz')
-            feature_model.save()
-
-    # Update batch status
-    batch.status = models.PreprocessingBatch.Status.FINISHED
-    batch.save()
+        preprocess_image.delay(batch.pk, image.pk, downsample)
 
 
 def upload_analysis_images(output_dir: str):
@@ -300,18 +344,6 @@ def run_utm(analysis_id: int):
         # Save
         analysis_result.save()
         dataset.save()
-
-
-def _already_preprocessed(image: models.Image, batch_id: int) -> bool:
-    return all(
-        model.objects.filter(source_image=image, preprocessing_batch=batch_id).count() > 0
-        for model in [
-            models.JacobianImage,
-            models.SegmentedImage,
-            models.RegisteredImage,
-            models.FeatureImage,
-        ]
-    )
 
 
 def _write_csv(csvfile: TextIO, headers: List[str], rows: List[dict]):
