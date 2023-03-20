@@ -164,7 +164,7 @@ def preprocess_image(batch_id: int, image_id: int, downsample: float):
 
 
 @shared_task(on_failure=handle_preprocess_failure)
-def preprocess_images(batch_id: int, downsample: float = 3.0):
+def preprocess_images(batch_id: int, downsample: float = 2.0):
     # Fetch atlases, raising an error if some aren't found
     atlas = models.Atlas.objects.get(name='T1.nii.gz')
     atlas_csf = models.Atlas.objects.get(name='csf.nii.gz')
