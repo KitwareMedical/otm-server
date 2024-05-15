@@ -11,6 +11,7 @@ module "django" {
   route53_zone_id  = data.aws_route53_zone.kitware_otm.zone_id
   subdomain_name   = "app"
 
+  heroku_app_name                    = "otm-kitware"
   heroku_postgresql_plan             = "standard-0"
   heroku_cloudamqp_plan              = "squirrel-1"
   heroku_worker_dyno_quantity        = 0
