@@ -38,7 +38,7 @@ setup(
     install_requires=[
         'boto3[s3]',
         'celery',
-        'django~=3.2',
+        'django<4.2',
         'django-admin-display',
         'django-allauth',
         'django-cleanup',
